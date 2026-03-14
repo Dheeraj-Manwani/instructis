@@ -7,12 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  STUDENT
-  FACULTY
-  SUPER_ADMIN
-}
-
 enum ExamType {
   JEE
   NEET
@@ -48,30 +42,23 @@ enum NotificationType {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String?  @unique
-  password  String
-  role      Role     @default(STUDENT)
-  avatar    String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  role          String?
+  createdAt     DateTime
+  updatedAt     DateTime
 
-  student       Student?
   faculty       Faculty?
-  superAdmin    SuperAdmin?
+  student       Student?
   notifications Notification[]
   sessions      Session[]
-}
+  accounts      Account[]
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([email])
+  @@map("user")
 }
 
 model Student {
@@ -106,12 +93,6 @@ model Faculty {
   mockTests MockTest[]
   marks     Mark[]         @relation("FacultyMarks")
   batches   BatchFaculty[]
-}
-
-model SuperAdmin {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
 }
 
 model Batch {
@@ -319,4 +300,51 @@ model WhatsAppLog {
   status      String
   sentAt      DateTime @default(now())
   metadata    Json?
+}
+
+// auth specific models
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
 }
