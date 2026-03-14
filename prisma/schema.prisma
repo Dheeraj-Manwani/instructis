@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  FACULTY
+  SUPER_ADMIN
+}
+
+enum ExamType {
+  JEE
+  NEET
+  BOTH
+}
+
+enum QuestionType {
+  MCQ
+  NUMERICAL
+  MULTI_CORRECT
+}
+
+enum Difficulty {
+  EASY
+  MODERATE
+  HARD
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum NotificationType {
+  MARKS_UPLOADED
+  TEST_RESULT
+  RANK_UPDATE
+  WEAK_AREA_ALERT
+  PARENT_NOTIFIED
+  ASSIGNMENT
+  GENERAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?  @unique
+  password  String
+  role      Role     @default(STUDENT)
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student       Student?
+  faculty       Faculty?
+  superAdmin    SuperAdmin?
+  notifications Notification[]
+  sessions      Session[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Student {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  rollNo      String    @unique
+  targetExam  ExamType  @default(JEE)
+  batchId     String?
+  batch       Batch?    @relation(fields: [batchId], references: [id])
+  parentName  String?
+  parentPhone String?
+  parentEmail String?
+  address     String?
+  dob         DateTime?
+
+  marks           Mark[]
+  testAttempts    TestAttempt[]
+  weakAreas       WeakArea[]
+  rankPredictions RankPrediction[]
+  attendances     Attendance[]
+  whatsappLogs    WhatsAppLog[]
+}
+
+model Faculty {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id])
+  department String?
+
+  questions Question[]
+  mockTests MockTest[]
+  marks     Mark[]         @relation("FacultyMarks")
+  batches   BatchFaculty[]
+}
+
+model SuperAdmin {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String
+  examType  ExamType
+  year      Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  students  Student[]
+  faculties BatchFaculty[]
+  mockTests MockTest[]
+}
+
+model BatchFaculty {
+  batchId   String
+  facultyId String
+  batch     Batch   @relation(fields: [batchId], references: [id])
+  faculty   Faculty @relation(fields: [facultyId], references: [id])
+
+  @@id([batchId, facultyId])
+}
+
+model Subject {
+  id       String   @id @default(cuid())
+  name     String
+  examType ExamType
+  maxMarks Int      @default(300)
+
+  topics    Topic[]
+  questions Question[]
+  marks     Mark[]
+}
+
+model Topic {
+  id        String  @id @default(cuid())
+  name      String
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  questions Question[]
+  weakAreas WeakArea[]
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  text        String
+  type        QuestionType @default(MCQ)
+  difficulty  Difficulty   @default(MODERATE)
+  subjectId   String
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  topicId     String?
+  topic       Topic?       @relation(fields: [topicId], references: [id])
+  facultyId   String
+  faculty     Faculty      @relation(fields: [facultyId], references: [id])
+  explanation String?
+  isPublished Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  options           QuestionOption[]
+  answers           StudentAnswer[]
+  mockTestQuestions MockTestQuestion[]
+}
+
+model QuestionOption {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  text       String
+  isCorrect  Boolean  @default(false)
+  orderIndex Int
+}
+
+model MockTest {
+  id          String    @id @default(cuid())
+  name        String
+  examType    ExamType
+  batchId     String?
+  batch       Batch?    @relation(fields: [batchId], references: [id])
+  facultyId   String
+  faculty     Faculty   @relation(fields: [facultyId], references: [id])
+  duration    Int
+  totalMarks  Int
+  isPublished Boolean   @default(false)
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  questions MockTestQuestion[]
+  attempts  TestAttempt[]
+}
+
+model MockTestQuestion {
+  id         String   @id @default(cuid())
+  mockTestId String
+  mockTest   MockTest @relation(fields: [mockTestId], references: [id])
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  orderIndex Int
+  marks      Int      @default(4)
+  negMarks   Float    @default(1)
+}
+
+model TestAttempt {
+  id          String    @id @default(cuid())
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id])
+  mockTestId  String
+  mockTest    MockTest  @relation(fields: [mockTestId], references: [id])
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  totalScore  Float?
+  percentile  Float?
+  timeTaken   Int?
+
+  answers StudentAnswer[]
+}
+
+model StudentAnswer {
+  id               String      @id @default(cuid())
+  attemptId        String
+  attempt          TestAttempt @relation(fields: [attemptId], references: [id])
+  questionId       String
+  question         Question    @relation(fields: [questionId], references: [id])
+  selectedOptionId String?
+  numericalAnswer  Float?
+  isCorrect        Boolean?
+  marksAwarded     Float?
+  timeTaken        Int?
+}
+
+model Mark {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  facultyId     String
+  faculty       Faculty  @relation("FacultyMarks", fields: [facultyId], references: [id])
+  subjectId     String
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  testName      String
+  examType      ExamType
+  marksObtained Float
+  maxMarks      Float
+  percentile    Float?
+  improvement   Float?
+  batchId       String?
+  createdAt     DateTime @default(now())
+
+  @@index([studentId, subjectId, examType])
+}
+
+model RankPrediction {
+  id               String   @id @default(cuid())
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id])
+  examType         ExamType
+  percentile       Float
+  predictedRank    Int
+  targetPercentile Float?
+  targetRank       Int?
+  improvementPts   Float
+  createdAt        DateTime @default(now())
+}
+
+model WeakArea {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  topicId        String
+  topic          Topic    @relation(fields: [topicId], references: [id])
+  drawbackPoints Float
+  questionsCount Int      @default(0)
+  priority       Priority @default(HIGH)
+  updatedAt      DateTime @updatedAt
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  date      DateTime
+  isPresent Boolean  @default(true)
+  subject   String?
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+}
+
+model WhatsAppLog {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id])
+  parentPhone String
+  message     String
+  status      String
+  sentAt      DateTime @default(now())
+  metadata    Json?
+}
