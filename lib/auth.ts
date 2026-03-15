@@ -1,14 +1,31 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { sendEmail } from "./email";
+import {
+  getChangeEmailVerificationHtml,
+  getPasswordResetEmailHtml,
+  getVerificationEmailHtml,
+  sendEmail,
+} from "./email";
 import prisma from "./prisma";
-import { passwordSchema } from "./validation";
+import { passwordSchema } from "./validations/auth.schema";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => ({
+          data: {
+            ...user,
+            role: user.role ?? "student",
+          },
+        }),
+      },
+    },
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -19,10 +36,11 @@ export const auth = betterAuth({
     enabled: true,
     // requireEmailVerification: true, // Only if you want to block login completely
     async sendResetPassword({ user, url }) {
+      const html = getPasswordResetEmailHtml(user.name ?? null, url);
       await sendEmail({
         to: user.email,
-        subject: "Reset your password",
-        text: `Click the link to reset your password: ${url}`,
+        subject: "Reset your password – Instructis",
+        html,
       });
     },
   },
@@ -30,10 +48,11 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     async sendVerificationEmail({ user, url }) {
+      const html = getVerificationEmailHtml(user.name ?? null, url);
       await sendEmail({
         to: user.email,
-        subject: "Verify your email",
-        text: `Click the link to verify your email: ${url}`,
+        subject: "Verify your email – Instructis",
+        html,
       });
     },
   },
@@ -41,10 +60,11 @@ export const auth = betterAuth({
     changeEmail: {
       enabled: true,
       async sendChangeEmailVerification({ user, newEmail, url }: { user: User, newEmail: string, url: string }) {
+        const html = getChangeEmailVerificationHtml(user.name ?? null, newEmail, url);
         await sendEmail({
           to: user.email,
-          subject: "Approve email change",
-          text: `Your email has been changed to ${newEmail}. Click the link to approve the change: ${url}`,
+          subject: "Approve email change – Instructis",
+          html,
         });
       },
     },
@@ -52,13 +72,14 @@ export const auth = betterAuth({
       role: {
         type: "string",
         input: false,
+        defaultValue: "student",
       },
     },
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (
-        ctx.path === "/sign-up/email" ||
+        ctx.path === "/auth/sign-up/email" ||
         ctx.path === "/reset-password" ||
         ctx.path === "/change-password"
       ) {

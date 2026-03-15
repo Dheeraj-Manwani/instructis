@@ -10,6 +10,7 @@ export default async function AdminLayout({
   const user = session?.user;
 
   if (!user) redirect("/unauthorized");
+  if (!user.emailVerified) redirect("/verify-email");
   if (user.role !== "admin") redirect("/");
 
   return <>{children}</>;

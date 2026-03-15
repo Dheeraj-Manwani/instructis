@@ -19,7 +19,7 @@ import { ShieldCheck, UserCog, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-hot-toast";
 
-type Role = "student" | "faculty" | "superadmin";
+type Role = "student" | "faculty" | "admin";
 
 interface ManagedUser {
     id: string;
@@ -38,13 +38,13 @@ const initialUsers: ManagedUser[] = [
     { id: "5", name: "Sameer Gupta", email: "sameer.gupta@inst.edu", avatar: "SG", role: "faculty", joinedAt: "2023-06-01" },
     { id: "6", name: "Rohan Kumar", email: "rohan.kumar@inst.edu", avatar: "RK", role: "student", joinedAt: "2024-08-25" },
     { id: "7", name: "Dr. Farhan Khan", email: "farhan.khan@inst.edu", avatar: "FK", role: "faculty", joinedAt: "2022-01-10" },
-    { id: "8", name: "Admin User", email: "admin@inst.edu", avatar: "AU", role: "superadmin", joinedAt: "2021-01-01" },
+    { id: "8", name: "Admin User", email: "admin@inst.edu", avatar: "AU", role: "admin", joinedAt: "2021-01-01" },
 ];
 
 const roleBadge: Record<Role, { label: string; className: string }> = {
     student: { label: "Student", className: "bg-secondary text-secondary-foreground" },
     faculty: { label: "Faculty", className: "bg-primary/10 text-primary" },
-    superadmin: { label: "Super Admin", className: "bg-destructive/10 text-destructive" },
+    admin: { label: "Admin", className: "bg-destructive/10 text-destructive" },
 };
 
 export default function UserManagement() {
@@ -76,7 +76,7 @@ export default function UserManagement() {
     const counts = {
         student: users.filter((u) => u.role === "student").length,
         faculty: users.filter((u) => u.role === "faculty").length,
-        superadmin: users.filter((u) => u.role === "superadmin").length,
+        admin: users.filter((u) => u.role === "admin").length,
     };
 
     return (
@@ -88,13 +88,13 @@ export default function UserManagement() {
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-foreground">User Role Management</h2>
-                    <p className="text-sm text-muted-foreground">Super Admin access only — assign roles to platform users</p>
+                    <p className="text-sm text-muted-foreground">Admin access only — assign roles to platform users</p>
                 </div>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
-                {([["Students", counts.student, "secondary"], ["Faculty", counts.faculty, "primary"], ["Super Admins", counts.superadmin, "destructive"]] as const).map(
+                {([["Students", counts.student, "secondary"], ["Faculty", counts.faculty, "primary"], ["Admins", counts.admin, "destructive"]] as const).map(
                     ([label, count, color]) => (
                         <Card key={label}>
                             <CardContent className="flex items-center justify-between p-4">
@@ -134,7 +134,7 @@ export default function UserManagement() {
                                 <SelectItem value="all">All Roles</SelectItem>
                                 <SelectItem value="student">Student</SelectItem>
                                 <SelectItem value="faculty">Faculty</SelectItem>
-                                <SelectItem value="superadmin">Super Admin</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -180,7 +180,7 @@ export default function UserManagement() {
                                                 <SelectContent>
                                                     <SelectItem value="student">Student</SelectItem>
                                                     <SelectItem value="faculty">Faculty</SelectItem>
-                                                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                                                    <SelectItem value="admin">Admin</SelectItem>
                                                 </SelectContent>
                                             </Select>
 

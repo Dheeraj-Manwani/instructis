@@ -12,7 +12,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
-import { passwordSchema } from "@/lib/validation";
+import { passwordSchema } from "@/lib/validations/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -53,7 +53,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       setError(error.message || "Something went wrong");
     } else {
       setSuccess("Password has been reset. You can now sign in.");
-      setTimeout(() => router.push("/sign-in"), 3000);
+      setTimeout(() => router.push("/auth/sign-in"), 3000);
       form.reset();
     }
   }

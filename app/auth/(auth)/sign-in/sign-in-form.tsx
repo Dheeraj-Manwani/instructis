@@ -1,17 +1,10 @@
 "use client";
 
+import { AuthFormShell } from "../auth-form-shell";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import LoadingButton from "@/components/LoadingButton";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
@@ -23,14 +16,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { signInSchema, SignInValues } from "@/lib/validation";
+import { signInSchema, SignInValues } from "@/lib/validations/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
-import { z } from "zod";
+
+const inputClass =
+  "h-10 rounded-lg border border-border/60 bg-muted/50 text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/20";
 
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
@@ -87,30 +82,57 @@ export function SignInForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle className="text-lg md:text-xl">Sign In</CardTitle>
-        <CardDescription className="text-xs md:text-sm">
-          Enter your email below to login to your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <AuthFormShell>
+      <div className="mx-auto w-full max-w-[360px]">
+        <h2 className="font-semibold text-foreground text-xl sm:text-2xl">
+          Welcome back 👋
+        </h2>
+        <p className="mt-1.5 text-muted-foreground text-sm">
+          Login to{" "}
+          <span className="font-semibold text-primary">Instructis</span> and
+          continue your learning journey.
+        </p>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6 h-10 w-full gap-2 rounded-lg border-border bg-background font-medium text-foreground hover:bg-muted/50"
+          disabled={loading}
+          onClick={() => handleSocialSignIn("google")}
+        >
+          <GoogleIcon width="0.98em" height="1em" />
+          Sign in with Google
+        </Button>
+
+        <div className="relative my-6">
+          <span className="bg-card text-muted-foreground absolute inset-0 flex items-center justify-center text-xs">
+            <span className="bg-card px-2">OR</span>
+          </span>
+          <div className="h-px bg-border" />
+        </div>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-col gap-4"
+          >
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel className="text-foreground text-sm font-medium">
+                    Email
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="your@email.com"
+                      placeholder="Enter your email"
+                      className={inputClass}
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
@@ -120,23 +142,26 @@ export function SignInForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center">
-                    <FormLabel>Password</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-foreground text-sm font-medium">
+                      Password
+                    </FormLabel>
                     <Link
                       href="/forgot-password"
-                      className="ml-auto inline-block text-sm underline"
+                      className="text-muted-foreground hover:text-primary text-xs underline-offset-4 hover:underline"
                     >
-                      Forgot your password?
+                      Forgot password?
                     </Link>
                   </div>
                   <FormControl>
                     <PasswordInput
                       autoComplete="current-password"
-                      placeholder="Password"
+                      placeholder="Enter your password"
+                      className={inputClass}
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
@@ -145,53 +170,50 @@ export function SignInForm() {
               control={form.control}
               name="rememberMe"
               render={({ field }) => (
-                <FormItem className="flex items-center gap-2">
+                <FormItem className="flex flex-row items-center gap-2.5">
                   <FormControl>
                     <Checkbox
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      className="rounded border-border"
                     />
                   </FormControl>
-                  <FormLabel>Remember me</FormLabel>
+                  <FormLabel className="mt-0! cursor-pointer text-muted-foreground text-sm font-normal">
+                    Remember me
+                  </FormLabel>
                 </FormItem>
               )}
             />
 
             {error && (
-              <div role="alert" className="text-sm text-red-600">
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-sm"
+              >
                 {error}
               </div>
             )}
 
-            <LoadingButton type="submit" className="w-full" loading={loading}>
-              Login
+            <LoadingButton
+              type="submit"
+              className="h-10 w-full rounded-lg font-medium"
+              loading={loading}
+            >
+              Log in
             </LoadingButton>
-
-            <div className="flex w-full flex-col items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                disabled={loading}
-                onClick={() => handleSocialSignIn("google")}
-              >
-                <GoogleIcon width="0.98em" height="1em" />
-                Sign in with Google
-              </Button>
-            </div>
           </form>
         </Form>
-      </CardContent>
-      <CardFooter>
-        <div className="flex w-full justify-center border-t pt-4">
-          <p className="text-muted-foreground text-center text-xs">
-            Don&apos;t have an account?{" "}
-            <Link href="/sign-up" className="underline">
-              Sign up
-            </Link>
-          </p>
-        </div>
-      </CardFooter>
-    </Card>
+
+        <p className="text-muted-foreground mt-6 text-center text-sm">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/auth/sign-up"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </AuthFormShell>
   );
 }

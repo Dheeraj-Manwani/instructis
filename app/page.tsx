@@ -29,7 +29,7 @@ export default function LandingPage() {
             </Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/sign-in">Sign In</Link>
+            <Link href="/auth/sign-in">Sign In</Link>
           </Button>
         </div>
       </div>

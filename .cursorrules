@@ -1,0 +1,73 @@
+# Instructis — Next.js 14+ App Router project rules
+
+Follow these rules for every file you create or modify in this project.
+
+## Folder structure
+
+- `app/api/v1/[resource]/route.ts` — HTTP route handlers only (list/create)
+- `app/api/v1/[resource]/[id]/route.ts` — Resource by ID (get/update/delete)
+- `services/[resource].service.ts` — Business logic
+- `repositories/[resource].repository.ts` — Prisma queries only
+- `lib/middlewares/` — withAuth, withRole, withValidation, withRateLimit
+- `lib/utils/api-response.ts` — Standardised ApiResponse helper
+- `lib/utils/errors.ts` — AppError, NotFoundError, ForbiddenError, ValidationError
+- `lib/utils/catchAsync.ts` — Async error wrapper for all routes
+- `lib/validations/[resource].schema.ts` — Zod schemas
+- `types/` — Global TypeScript types
+
+## Layer rules
+
+- **route.ts**: No business logic. Only call withAuth, withRole, withValidation, then delegate to service. Always wrap with catchAsync.
+- **service**: No Prisma imports. No HTTP/Next.js imports. Only business logic and calls to repository.
+- **repository**: Only Prisma queries. No business logic. No service imports.
+- **lib/**: Infrastructure only. Auth config, Prisma client, Zod schemas, utilities.
+
+## Route pattern (every route must follow this exactly)
+
+```ts
+export const GET = catchAsync(async (req, { params }) => {
+  const session = await withAuth(req);
+  withRole(session, "ROLE");
+  const data = await someService.method();
+  return ApiResponse.success(data);
+});
+```
+
+## ApiResponse shape
+
+Always use ApiResponse; never return raw `Response.json`.
+
+- `ApiResponse.success(data, message?, meta?)` → 200
+- `ApiResponse.created(data, message?)` → 201
+- `ApiResponse.error(message, status?)` → 400
+- `ApiResponse.unauthorized()` → 401
+- `ApiResponse.forbidden()` → 403
+- `ApiResponse.notFound()` → 404
+
+## Error handling
+
+- Always throw AppError subclasses from service/repository layers; never return error objects.
+- catchAsync catches all thrown errors and maps them to ApiResponse.error automatically.
+- Never use try/catch inside route handlers.
+
+## Validation
+
+- All request bodies validated with `withValidation(req, schema)` using Zod.
+- Schemas live in `lib/validations/[resource].schema.ts`.
+- Never access `req.json()` directly in route handlers.
+
+## Auth
+
+- Auth: Better Auth with Prisma adapter.
+- Session check: `withAuth(req)` — throws 401 if no session.
+- Role check: `withRole(session, ...roles)` — throws 403 if insufficient role.
+- Roles are strings: `"STUDENT"` | `"FACULTY"` | `"ADMIN"` (compared case-insensitively with DB role).
+
+## General
+
+- All API routes are versioned under `/api/v1/`.
+- Webhooks live under `/api/webhooks/` outside versioning.
+- Never put business logic in route.ts.
+- Never import Prisma directly in services.
+- Never import Next.js headers/cookies in services or repositories.
+- Pagination always returns `{ data, meta: { total, page, limit, totalPages } }`.

@@ -26,10 +26,10 @@ export default function UnauthorizedPage() {
 
         <div className="mt-8 flex gap-3">
           <Button asChild>
-            <Link href="/sign-in">Sign In</Link>
+            <Link href="/auth/sign-in">Sign In</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/sign-up">Create Account</Link>
+            <Link href="/auth/sign-up">Create Account</Link>
           </Button>
         </div>
       </div>

@@ -1,15 +1,8 @@
 "use client";
 
+import { AuthFormShell } from "../auth-form-shell";
 import LoadingButton from "@/components/LoadingButton";
 import { PasswordInput } from "@/components/PasswordInput";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -20,14 +13,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { passwordSchema, signUpSchema, SignUpValues } from "@/lib/validation";
+import { signUpSchema, SignUpValues } from "@/lib/validations/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
-import { z } from "zod";
+
+const inputClass =
+  "h-10 rounded-lg border border-border/60 bg-muted/50 text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/20";
 
 export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
@@ -58,33 +53,46 @@ export function SignUpForm() {
       setError(error.message || "Something went wrong");
     } else {
       toast.success("Signed up successfully");
-      router.push("/");
+      router.push("/verify-email");
     }
   }
 
   const loading = form.formState.isSubmitting;
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle className="text-lg md:text-xl">Sign Up</CardTitle>
-        <CardDescription className="text-xs md:text-sm">
-          Enter your information to create an account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <AuthFormShell>
+      <div className="mx-auto w-full max-w-[360px]">
+        <h2 className="font-semibold text-foreground text-xl sm:text-2xl">
+          Join{" "}
+          <span className="bg-linear-to-r from-primary to-[hsl(142,72%,22%)] bg-clip-text font-semibold text-transparent">
+            Instructis
+          </span>
+        </h2>
+        <p className="mt-1.5 text-muted-foreground text-sm">
+          Where learning is tracked and <em>you</em> succeed.
+        </p>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="mt-6 flex flex-col gap-4"
+          >
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel className="text-foreground text-sm font-medium">
+                    Name
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input
+                      placeholder="Choose your name"
+                      className={inputClass}
+                      {...field}
+                    />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
@@ -94,15 +102,18 @@ export function SignUpForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel className="text-foreground text-sm font-medium">
+                    Email
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="your@email.com"
+                      placeholder="you@example.com"
+                      className={inputClass}
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
@@ -112,15 +123,18 @@ export function SignUpForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel className="text-foreground text-sm font-medium">
+                    Password
+                  </FormLabel>
                   <FormControl>
                     <PasswordInput
                       autoComplete="new-password"
-                      placeholder="Password"
+                      placeholder="Enter a secure password"
+                      className={inputClass}
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
@@ -130,41 +144,51 @@ export function SignUpForm() {
               name="passwordConfirmation"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
+                  <FormLabel className="text-foreground text-sm font-medium">
+                    Confirm password
+                  </FormLabel>
                   <FormControl>
                     <PasswordInput
                       autoComplete="new-password"
-                      placeholder="Confirm password"
+                      placeholder="Confirm your password"
+                      className={inputClass}
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-destructive text-xs" />
                 </FormItem>
               )}
             />
 
             {error && (
-              <div role="alert" className="text-sm text-red-600">
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-sm"
+              >
                 {error}
               </div>
             )}
 
-            <LoadingButton type="submit" className="w-full" loading={loading}>
-              Create an account
+            <LoadingButton
+              type="submit"
+              className="h-10 w-full rounded-lg font-medium"
+              loading={loading}
+            >
+              Create account
             </LoadingButton>
           </form>
         </Form>
-      </CardContent>
-      <CardFooter>
-        <div className="flex w-full justify-center border-t pt-4">
-          <p className="text-muted-foreground text-center text-xs">
-            Already have an account?{" "}
-            <Link href="/sign-in" className="underline">
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </CardFooter>
-    </Card>
+
+        <p className="text-muted-foreground mt-6 text-center text-sm">
+          Already have an account?{" "}
+          <Link
+            href="/auth/sign-in"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Log in
+          </Link>
+        </p>
+      </div>
+    </AuthFormShell>
   );
 }

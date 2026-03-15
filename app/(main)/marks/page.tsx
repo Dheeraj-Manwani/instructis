@@ -24,11 +24,11 @@ export default function MarksUpload() {
     );
     const highestPct = Math.max(...marksData.map((s) => s.jeePercentile));
 
-    // Dummy improvement per-subject data
-    const subjectImprovements: Record<string, Record<string, number>> = {
-        "1": { physics: 5, chemistry: 8 },
-        "3": { math: 3, physics: 6, chemistry: 4 },
-    };
+    // // Dummy improvement per-subject data
+    // const subjectImprovements: Record<string, Record<string, number>> = {
+    //     "1": { physics: 5, chemistry: 8 },
+    //     "3": { math: 3, physics: 6, chemistry: 4 },
+    // };
 
     return (
         <div className="space-y-5">
@@ -77,9 +77,14 @@ export default function MarksUpload() {
             {/* Action links row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-4">
-                    <button className="flex items-center gap-1.5 text-sm font-medium text-jee hover:underline">
+                    <a
+                        href="/api/template"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm font-medium text-jee hover:underline"
+                    >
                         <Download size={14} /> Download Template File (.xlsx)
-                    </button>
+                    </a>
                     <button className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline">
                         <History size={14} /> View Upload History
                     </button>
@@ -137,7 +142,7 @@ export default function MarksUpload() {
                     <tbody>
                         {marksData.map((s, i) => {
                             const total = s.marks.math + s.marks.physics + s.marks.chemistry;
-                            const improvements = subjectImprovements[s.id] || {};
+                            // const improvements = subjectImprovements[s.id] || {};
                             return (
                                 <tr key={s.id} className={cn("border-b border-border last:border-0 hover:bg-muted/30 transition-colors", i % 2 === 0 ? "bg-card" : "bg-muted/20")}>
                                     <td className="px-3 py-3">
@@ -160,11 +165,11 @@ export default function MarksUpload() {
                                                     onChange={(e) => updateMark(s.id, sub, parseInt(e.target.value) || 0)}
                                                     className="w-16 rounded border border-border bg-background px-2 py-1 text-center font-mono text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                                 />
-                                                {improvements[sub] && (
+                                                {/* {improvements[sub] && (
                                                     <span className="flex items-center gap-0.5 text-[10px] font-bold text-success">
                                                         <TrendingUp size={10} /> +{improvements[sub]}
                                                     </span>
-                                                )}
+                                                )} */}
                                             </div>
                                         </td>
                                     ))}
@@ -175,9 +180,9 @@ export default function MarksUpload() {
                                         <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono", getPercentileBg(s.jeePercentile))}>
                                             {s.jeePercentile}%
                                         </span>
-                                        <span className={cn("ml-1.5 text-[10px] font-bold", s.improvement > 0 ? "text-success" : s.improvement < 0 ? "text-destructive" : "text-muted-foreground")}>
+                                        {/* <span className={cn("ml-1.5 text-[10px] font-bold", s.improvement > 0 ? "text-success" : s.improvement < 0 ? "text-destructive" : "text-muted-foreground")}>
                                             {s.improvement > 0 ? `+${s.improvement} Points` : `${s.improvement} Points`}
-                                        </span>
+                                        </span> */}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-1.5">

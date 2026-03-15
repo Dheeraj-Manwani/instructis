@@ -11,6 +11,7 @@ export default async function MainLayout({
   const user = session?.user;
 
   if (!user) redirect("/unauthorized");
+  if (!user.emailVerified) redirect("/verify-email");
 
   return <DashboardLayout>{children}</DashboardLayout>;
 }

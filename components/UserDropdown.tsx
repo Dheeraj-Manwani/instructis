@@ -5,7 +5,6 @@ import { authClient } from "@/lib/auth-client";
 import { LogOutIcon, ShieldIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
 import {
@@ -41,7 +40,17 @@ export function UserDropdown({ user }: UserDropdownProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+        <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
+          <span className="text-sm text-muted-foreground">{user.email}</span>
+          {user.role && (
+            <span className="text-xs font-medium text-foreground">
+              {user.role
+                .replace(/_/g, " ")
+                .toLowerCase()
+                .replace(/\b\w/g, (c) => c.toUpperCase())}
+            </span>
+          )}
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/profile">
@@ -66,15 +75,13 @@ function AdminItem() {
 }
 
 function SignOutItem() {
-  const router = useRouter();
-
   async function handleSignOut() {
     const { error } = await authClient.signOut();
     if (error) {
       toast.error(error.message || "Something went wrong");
     } else {
       toast.success("Signed out successfully");
-      router.push("/auth/sign-in");
+      window.location.href = "/auth/sign-in";
     }
   }
 

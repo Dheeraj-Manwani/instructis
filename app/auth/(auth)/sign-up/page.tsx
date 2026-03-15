@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { SignUpForm } from "./sign-up-form";
 
 export const metadata: Metadata = {
-  title: "Sign up",
+  title: "Sign up | Instructis",
+  description: "Create your Instructis account",
 };
 
 export default function SignUp() {
   return (
-    <main className="flex min-h-svh items-center justify-center px-4">
+    <main className="min-h-svh">
       <SignUpForm />
     </main>
   );

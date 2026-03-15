@@ -47,7 +47,7 @@ model User {
   email         String
   emailVerified Boolean
   image         String?
-  role          String?
+  role          String   @default("student")
   createdAt     DateTime
   updatedAt     DateTime
 

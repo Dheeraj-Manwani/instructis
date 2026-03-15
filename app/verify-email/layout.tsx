@@ -2,7 +2,7 @@ import { getServerSession } from "@/lib/get-session";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 
-export default async function AuthLayout({
+export default async function VerifyEmailLayout({
   children,
 }: {
   children: ReactNode;
@@ -10,8 +10,8 @@ export default async function AuthLayout({
   const session = await getServerSession();
   const user = session?.user;
 
-  if (user?.emailVerified) redirect("/");
-  if (user && !user.emailVerified) redirect("/verify-email");
+  if (!user) redirect("/auth/sign-in");
+  if (user.emailVerified) redirect("/");
 
-  return children;
+  return <>{children}</>;
 }
