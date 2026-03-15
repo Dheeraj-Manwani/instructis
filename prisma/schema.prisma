@@ -10,7 +10,14 @@ datasource db {
 enum ExamType {
   JEE
   NEET
-  BOTH
+}
+
+enum SubjectEnum {
+  PHYSICS
+  CHEMISTRY
+  MATHEMATICS
+  ZOOLOGY
+  BOTANY
 }
 
 enum QuestionType {
@@ -41,13 +48,20 @@ enum NotificationType {
   GENERAL
 }
 
+enum RoleEnum {
+  USER
+  STUDENT
+  FACULTY
+  ADMIN
+}
+
 model User {
   id            String   @id
   name          String
   email         String
   emailVerified Boolean
   image         String?
-  role          String   @default("student")
+  role          RoleEnum @default(USER)
   createdAt     DateTime
   updatedAt     DateTime
 
@@ -87,6 +101,7 @@ model Faculty {
   id         String  @id @default(cuid())
   userId     String  @unique
   user       User    @relation(fields: [userId], references: [id])
+  title      String?
   department String?
 
   questions Question[]
@@ -117,41 +132,29 @@ model BatchFaculty {
   @@id([batchId, facultyId])
 }
 
-model Subject {
-  id       String   @id @default(cuid())
-  name     String
-  examType ExamType
-  maxMarks Int      @default(300)
-
-  topics    Topic[]
-  questions Question[]
-  marks     Mark[]
-}
-
 model Topic {
-  id        String  @id @default(cuid())
-  name      String
-  subjectId String
-  subject   Subject @relation(fields: [subjectId], references: [id])
+  id      String      @id @default(cuid())
+  name    String
+  subject SubjectEnum
 
   questions Question[]
   weakAreas WeakArea[]
 }
 
 model Question {
-  id          String       @id @default(cuid())
-  text        String
-  type        QuestionType @default(MCQ)
-  difficulty  Difficulty   @default(MODERATE)
-  subjectId   String
-  subject     Subject      @relation(fields: [subjectId], references: [id])
+  id         String       @id @default(cuid())
+  text       String
+  type       QuestionType @default(MCQ)
+  difficulty Difficulty   @default(MODERATE)
+  subject    SubjectEnum
+
   topicId     String?
-  topic       Topic?       @relation(fields: [topicId], references: [id])
+  topic       Topic?   @relation(fields: [topicId], references: [id])
   facultyId   String
-  faculty     Faculty      @relation(fields: [facultyId], references: [id])
+  faculty     Faculty  @relation(fields: [facultyId], references: [id])
   explanation String?
-  isPublished Boolean      @default(false)
-  createdAt   DateTime     @default(now())
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   options           QuestionOption[]
   answers           StudentAnswer[]
@@ -168,18 +171,25 @@ model QuestionOption {
 }
 
 model MockTest {
-  id          String    @id @default(cuid())
-  name        String
-  examType    ExamType
-  batchId     String?
-  batch       Batch?    @relation(fields: [batchId], references: [id])
-  facultyId   String
-  faculty     Faculty   @relation(fields: [facultyId], references: [id])
-  duration    Int
-  totalMarks  Int
-  isPublished Boolean   @default(false)
-  scheduledAt DateTime?
-  createdAt   DateTime  @default(now())
+  id   String @id @default(cuid())
+  name String
+
+  batchId String?
+  batch   Batch?  @relation(fields: [batchId], references: [id])
+
+  facultyId String
+  faculty   Faculty @relation(fields: [facultyId], references: [id])
+
+  duration              Int
+  totalMarks            Int
+  totalMarksPhysics     Int?
+  totalMarksChemistry   Int?
+  totalMarksMathematics Int?
+  totalMarksZoology     Int?
+  totalMarksBotany      Int?
+  isPublished           Boolean   @default(false)
+  scheduledAt           DateTime?
+  createdAt             DateTime  @default(now())
 
   questions MockTestQuestion[]
   attempts  TestAttempt[]
@@ -197,18 +207,28 @@ model MockTestQuestion {
 }
 
 model TestAttempt {
-  id          String    @id @default(cuid())
-  studentId   String
-  student     Student   @relation(fields: [studentId], references: [id])
-  mockTestId  String
-  mockTest    MockTest  @relation(fields: [mockTestId], references: [id])
-  startedAt   DateTime  @default(now())
-  submittedAt DateTime?
-  totalScore  Float?
-  percentile  Float?
-  timeTaken   Int?
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+
+  mockTestId String
+  mockTest   MockTest @relation(fields: [mockTestId], references: [id])
+
+  startedAt        DateTime  @default(now())
+  submittedAt      DateTime?
+  physicsMarks     Float?
+  chemistryMarks   Float?
+  mathematicsMarks Float?
+  zoologyMarks     Float?
+  botanyMarks      Float?
+  totalScore       Float?
+  percentile       Float?
+  timeTaken        Int?
 
   answers StudentAnswer[]
+
+  @@index([studentId, mockTestId])
 }
 
 model StudentAnswer {
@@ -225,13 +245,15 @@ model StudentAnswer {
 }
 
 model Mark {
-  id            String   @id @default(cuid())
-  studentId     String
-  student       Student  @relation(fields: [studentId], references: [id])
-  facultyId     String
-  faculty       Faculty  @relation("FacultyMarks", fields: [facultyId], references: [id])
-  subjectId     String
-  subject       Subject  @relation(fields: [subjectId], references: [id])
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id])
+
+  facultyId String
+  faculty   Faculty @relation("FacultyMarks", fields: [facultyId], references: [id])
+
+  subject       SubjectEnum
   testName      String
   examType      ExamType
   marksObtained Float
@@ -239,9 +261,9 @@ model Mark {
   percentile    Float?
   improvement   Float?
   batchId       String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
 
-  @@index([studentId, subjectId, examType])
+  @@index([studentId, subject, examType])
 }
 
 model RankPrediction {

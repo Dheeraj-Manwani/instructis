@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,47 +11,66 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialog, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ShieldCheck, UserCog, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-hot-toast";
+import { fetchUsers, updateUserRole, type UserListItem } from "@/lib/api/users";
+import { RoleEnum } from "@prisma/client";
+import LoadingButton from "@/components/LoadingButton";
 
-type Role = "student" | "faculty" | "admin";
+type Role = "STUDENT" | "FACULTY" | "ADMIN" | 'USER';
 
-interface ManagedUser {
-    id: string;
-    name: string;
-    email: string;
-    avatar: string;
-    role: Role;
-    joinedAt: string;
-}
-
-const initialUsers: ManagedUser[] = [
-    { id: "1", name: "Rahul Sharma", email: "rahul.sharma@inst.edu", avatar: "RS", role: "student", joinedAt: "2024-08-15" },
-    { id: "2", name: "Priya Joshi", email: "priya.joshi@inst.edu", avatar: "PJ", role: "student", joinedAt: "2024-09-01" },
-    { id: "3", name: "Tanvi Mehta", email: "tanvi.mehta@inst.edu", avatar: "TM", role: "student", joinedAt: "2024-07-20" },
-    { id: "4", name: "Aditya Verma", email: "aditya.verma@inst.edu", avatar: "AV", role: "student", joinedAt: "2024-10-10" },
-    { id: "5", name: "Sameer Gupta", email: "sameer.gupta@inst.edu", avatar: "SG", role: "faculty", joinedAt: "2023-06-01" },
-    { id: "6", name: "Rohan Kumar", email: "rohan.kumar@inst.edu", avatar: "RK", role: "student", joinedAt: "2024-08-25" },
-    { id: "7", name: "Dr. Farhan Khan", email: "farhan.khan@inst.edu", avatar: "FK", role: "faculty", joinedAt: "2022-01-10" },
-    { id: "8", name: "Admin User", email: "admin@inst.edu", avatar: "AU", role: "admin", joinedAt: "2021-01-01" },
-];
-
-const roleBadge: Record<Role, { label: string; className: string }> = {
-    student: { label: "Student", className: "bg-secondary text-secondary-foreground" },
-    faculty: { label: "Faculty", className: "bg-primary/10 text-primary" },
-    admin: { label: "Admin", className: "bg-destructive/10 text-destructive" },
+const roleBadgeMap: Record<Role, { label: string; className: string }> = {
+    STUDENT: { label: "Student", className: "bg-secondary text-secondary-foreground" },
+    FACULTY: { label: "Faculty", className: "bg-primary/10 text-primary" },
+    ADMIN: { label: "Admin", className: "bg-destructive/10 text-destructive" },
+    USER: { label: "User", className: "bg-muted text-muted-foreground" },
 };
 
+function getRoleBadge(role: Role) {
+    return roleBadgeMap[role];
+}
+
+function getInitials(name: string): string {
+    return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+}
+
 export default function UserManagement() {
-    const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
+    const queryClient = useQueryClient();
+    const [page, setPage] = useState(1);
+    const [limit] = useState(50);
     const [search, setSearch] = useState("");
     const [filterRole, setFilterRole] = useState<string>("all");
     const [pendingChange, setPendingChange] = useState<{ userId: string; newRole: Role } | null>(null);
+
+    const { data, isLoading } = useQuery({
+        queryKey: ["users", page, limit],
+        queryFn: () => fetchUsers({ page, limit }),
+    });
+
+    const users = data?.data ?? [];
+    const meta = data?.meta ?? { total: 0, page: 1, limit: 10, totalPages: 0 };
+
+    const updateRoleMutation = useMutation({
+        mutationFn: ({ userId, role }: { userId: string; role: RoleEnum }) =>
+            updateUserRole(userId, role),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+            toast.success("User role updated successfully");
+            setPendingChange(null);
+        },
+        onError: (e: Error) => {
+            toast.error(e.message || "Failed to update user role");
+        },
+    });
 
     const filtered = users.filter((u) => {
         const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -65,18 +84,17 @@ export default function UserManagement() {
 
     const confirmRoleChange = () => {
         if (!pendingChange) return;
-        setUsers((prev) =>
-            prev.map((u) => (u.id === pendingChange.userId ? { ...u, role: pendingChange.newRole } : u))
-        );
-        const user = users.find((u) => u.id === pendingChange.userId);
-        toast.success(`${user?.name} is now a ${pendingChange.newRole}.`);
-        setPendingChange(null);
+        updateRoleMutation.mutate({
+            userId: pendingChange.userId,
+            role: pendingChange.newRole as RoleEnum,
+        });
     };
 
     const counts = {
-        student: users.filter((u) => u.role === "student").length,
-        faculty: users.filter((u) => u.role === "faculty").length,
-        admin: users.filter((u) => u.role === "admin").length,
+        student: users.filter((u) => u.role === RoleEnum.STUDENT).length,
+        faculty: users.filter((u) => u.role === RoleEnum.FACULTY).length,
+        admin: users.filter((u) => u.role === RoleEnum.ADMIN).length,
+        user: users.filter((u) => u.role === RoleEnum.USER).length,
     };
 
     return (
@@ -93,8 +111,13 @@ export default function UserManagement() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-                {([["Students", counts.student, "secondary"], ["Faculty", counts.faculty, "primary"], ["Admins", counts.admin, "destructive"]] as const).map(
+            <div className="grid grid-cols-4 gap-4">
+                {([
+                    ["Students", counts.student, "secondary"],
+                    ["Faculty", counts.faculty, "primary"],
+                    ["Admins", counts.admin, "destructive"],
+                    ["Users", counts.user, "muted"],
+                ] as const).map(
                     ([label, count, color]) => (
                         <Card key={label}>
                             <CardContent className="flex items-center justify-between p-4">
@@ -132,9 +155,10 @@ export default function UserManagement() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Roles</SelectItem>
-                                <SelectItem value="student">Student</SelectItem>
-                                <SelectItem value="faculty">Faculty</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="USER">User</SelectItem>
+                                <SelectItem value="STUDENT">Student</SelectItem>
+                                <SelectItem value="FACULTY">Faculty</SelectItem>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -150,67 +174,99 @@ export default function UserManagement() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filtered.map((user) => (
-                                <TableRow key={user.id}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                                {user.avatar}
-                                            </div>
-                                            <span className="font-medium text-foreground">{user.name}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                                    <TableCell className="text-muted-foreground">{user.joinedAt}</TableCell>
-                                    <TableCell>
-                                        <Badge className={roleBadge[user.role].className}>{roleBadge[user.role].label}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <AlertDialog
-                                            open={pendingChange?.userId === user.id}
-                                            onOpenChange={(open) => { if (!open) setPendingChange(null); }}
-                                        >
-                                            <Select
-                                                value={user.role}
-                                                onValueChange={(val) => handleRoleChange(user.id, val as Role)}
-                                            >
-                                                <SelectTrigger className="w-[140px] ml-auto">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="student">Student</SelectItem>
-                                                    <SelectItem value="faculty">Faculty</SelectItem>
-                                                    <SelectItem value="admin">Admin</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Confirm role change</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        Change <strong>{user.name}</strong>'s role from{" "}
-                                                        <Badge className={roleBadge[user.role].className}>{roleBadge[user.role].label}</Badge> to{" "}
-                                                        <Badge className={roleBadge[pendingChange?.newRole ?? user.role].className}>
-                                                            {roleBadge[pendingChange?.newRole ?? user.role].label}
-                                                        </Badge>
-                                                        ? This action takes effect immediately.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={confirmRoleChange}>Confirm</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                            {isLoading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                        Loading users...
                                     </TableCell>
                                 </TableRow>
-                            ))}
-                            {filtered.length === 0 && (
+                            ) : filtered.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                                         No users found.
                                     </TableCell>
                                 </TableRow>
+                            ) : (
+                                filtered.map((user) => (
+                                    <TableRow key={user.id}>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                                    {getInitials(user.name)}
+                                                </div>
+                                                <span className="font-medium text-foreground">{user.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                                        <TableCell className="text-muted-foreground">
+                                            {new Date(user.createdAt).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className={getRoleBadge(user.role).className}>
+                                                {getRoleBadge(user.role).label}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <AlertDialog
+                                                open={pendingChange?.userId === user.id}
+                                                onOpenChange={(open) => {
+                                                    if (!open) setPendingChange(null);
+                                                }}
+                                            >
+                                                <Select
+                                                    value={user.role}
+                                                    onValueChange={(val) =>
+                                                        handleRoleChange(
+                                                            user.id,
+                                                            val as RoleEnum
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-[140px] ml-auto">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="USER">User</SelectItem>
+                                                        <SelectItem value="STUDENT">Student</SelectItem>
+                                                        <SelectItem value="FACULTY">Faculty</SelectItem>
+                                                        <SelectItem value="ADMIN">Admin</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Confirm role change</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Change <strong>{user.name}</strong>'s role from{" "}
+                                                            <Badge className={getRoleBadge(user.role).className}>
+                                                                {getRoleBadge(user.role).label}
+                                                            </Badge>{" "}
+                                                            to{" "}
+                                                            <Badge
+                                                                className={
+                                                                    getRoleBadge(pendingChange?.newRole ?? user.role)
+                                                                        .className
+                                                                }
+                                                            >
+                                                                {getRoleBadge(pendingChange?.newRole ?? user.role).label}
+                                                            </Badge>
+                                                            ? This action takes effect immediately.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <LoadingButton
+                                                            onClick={confirmRoleChange}
+                                                            loading={updateRoleMutation.isPending}
+                                                        >
+                                                            Confirm
+                                                        </LoadingButton>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
                         </TableBody>
                     </Table>

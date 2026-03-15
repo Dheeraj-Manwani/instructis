@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { RoleEnum } from "@prisma/client";
 import {
   getChangeEmailVerificationHtml,
   getPasswordResetEmailHtml,
@@ -8,7 +9,7 @@ import {
   sendEmail,
 } from "./email";
 import prisma from "./prisma";
-import { passwordSchema } from "./validations/auth.schema";
+import { passwordSchema } from "./schemas/auth.schema";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -20,7 +21,7 @@ export const auth = betterAuth({
         before: async (user) => ({
           data: {
             ...user,
-            role: user.role ?? "student",
+            role: user.role ?? RoleEnum.USER,
           },
         }),
       },
@@ -72,7 +73,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         input: false,
-        defaultValue: "student",
+        defaultValue: RoleEnum.USER,
       },
     },
   },

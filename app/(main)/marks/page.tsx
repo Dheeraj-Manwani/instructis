@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Upload, FileSpreadsheet, Save, Users, TrendingUp, Award, BellRing, Download, History, Zap, Plus, FileText, MessageCircle, MoreVertical } from "lucide-react";
 import { students, batchName, getPercentileBg } from "@/data/dummy";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function MarksUpload() {
     const [marksData, setMarksData] = useState(
@@ -75,7 +76,7 @@ export default function MarksUpload() {
             </div>
 
             {/* Action links row */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-4">
                     <a
                         href="/api/template"
@@ -92,7 +93,7 @@ export default function MarksUpload() {
                 <button className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors">
                     <Zap size={14} /> Auto Calculate & Notify Parents
                 </button>
-            </div>
+            </div> */}
 
             {/* Enter Marks Manually */}
             <div>
@@ -128,7 +129,7 @@ export default function MarksUpload() {
                     <thead>
                         <tr className="border-b border-border bg-muted/50">
                             <th className="w-8 px-3 py-3">
-                                <input type="checkbox" className="rounded border-border" />
+                                <Checkbox className="rounded border-border" />
                             </th>
                             <th className="px-4 py-3 text-left font-semibold text-foreground">Student Name</th>
                             <th className="px-4 py-3 text-center font-semibold text-foreground">Math <span className="text-xs text-muted-foreground font-normal">(300)</span></th>
@@ -146,7 +147,7 @@ export default function MarksUpload() {
                             return (
                                 <tr key={s.id} className={cn("border-b border-border last:border-0 hover:bg-muted/30 transition-colors", i % 2 === 0 ? "bg-card" : "bg-muted/20")}>
                                     <td className="px-3 py-3">
-                                        <input type="checkbox" className="rounded border-border" />
+                                        <Checkbox className="rounded border-border" />
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-3">

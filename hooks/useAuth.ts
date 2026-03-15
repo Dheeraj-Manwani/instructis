@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { RoleEnum } from "@prisma/client";
 
 export function useAuth() {
     const { data: session, isPending, error, refetch } = authClient.useSession();
@@ -13,6 +14,6 @@ export function useAuth() {
         error,
         refetch,
         isSignedIn: !!user,
-        isAdmin: user?.role === "admin",
+        isAdmin: user?.role === RoleEnum.ADMIN,
     };
 }

@@ -1,6 +1,7 @@
 import { ForbiddenError } from "@/lib/utils/errors";
 import * as userRepository from "@/repositories/user.repository";
 import type { PaginationMeta } from "@/types";
+import { RoleEnum } from "@prisma/client";
 
 export type ListUsersResult = {
   data: userRepository.UserListItem[];
@@ -18,12 +19,46 @@ export async function listUsers(page: number, limit: number): Promise<ListUsersR
 
 export async function getUserById(
   id: string,
-  context: { requestorId: string; requestorRole: string }
+  context: { requestorId: string; requestorRole: RoleEnum | string }
 ) {
   const isSelf = context.requestorId === id;
-  const isAdmin = context.requestorRole?.toUpperCase() === "ADMIN";
+  const isAdmin = context.requestorRole === "ADMIN" || context.requestorRole === RoleEnum.ADMIN;
   if (!isSelf && !isAdmin) {
     throw new ForbiddenError("You can only view your own profile");
   }
   return userRepository.getUserByIdOrThrow(id);
+}
+
+export async function updateUserRole(
+  userId: string,
+  newRole: RoleEnum
+) {
+  // Get current user to check existing role
+  const currentUser = await userRepository.getUserByIdOrThrow(userId);
+  const oldRole = currentUser.role;
+
+  // If role is not changing, do nothing
+  if (oldRole === newRole) {
+    return currentUser;
+  }
+
+  // Delete old role records (only if they were STUDENT or FACULTY)
+  if (oldRole === RoleEnum.STUDENT) {
+    await userRepository.deleteStudentRecord(userId);
+  } else if (oldRole === RoleEnum.FACULTY) {
+    await userRepository.deleteFacultyRecord(userId);
+  }
+
+  // Update user role
+  const updatedUser = await userRepository.updateUserRole(userId, newRole);
+
+  // Create new role records (only for STUDENT or FACULTY, not for USER or ADMIN)
+  if (newRole === RoleEnum.STUDENT) {
+    await userRepository.createStudentRecord(userId);
+  } else if (newRole === RoleEnum.FACULTY) {
+    await userRepository.createFacultyRecord(userId);
+  }
+  // USER and ADMIN roles don't need additional records
+
+  return updatedUser;
 }

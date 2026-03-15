@@ -12,18 +12,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
-import { passwordSchema } from "@/lib/validations/auth.schema";
+import {
+  resetPasswordSchema,
+  type ResetPasswordValues,
+} from "@/lib/schemas/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-const resetPasswordSchema = z.object({
-  newPassword: passwordSchema,
-});
-
-type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 interface ResetPasswordFormProps {
   token: string;

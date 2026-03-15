@@ -2,6 +2,7 @@
 
 import { User } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
+import { RoleEnum } from "@prisma/client";
 import { LogOutIcon, ShieldIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export function UserDropdown({ user }: UserDropdownProps) {
           <span className="text-sm text-muted-foreground">{user.email}</span>
           {user.role && (
             <span className="text-xs font-medium text-foreground">
-              {user.role
+              {String(user.role)
                 .replace(/_/g, " ")
                 .toLowerCase()
                 .replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -57,7 +58,7 @@ export function UserDropdown({ user }: UserDropdownProps) {
             <UserIcon className="size-4" /> <span>Profile</span>
           </Link>
         </DropdownMenuItem>
-        {user.role === "admin" && <AdminItem />}
+        {/* {user.role === RoleEnum.ADMIN && <AdminItem />} */}
         <SignOutItem />
       </DropdownMenuContent>
     </DropdownMenu>

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { signUpSchema, SignUpValues } from "@/lib/validations/auth.schema";
+import { signUpSchema, SignUpValues } from "@/lib/schemas/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -46,7 +46,7 @@ export function SignUpForm() {
       email,
       password,
       name,
-      callbackURL: "/email-verified",
+      callbackURL: "/",
     });
 
     if (error) {

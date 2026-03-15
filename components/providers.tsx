@@ -9,7 +9,15 @@ import NextTopLoader from "nextjs-toploader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60,
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -25,7 +33,9 @@ export function Providers({ children }: { children: ReactNode }) {
           {children}
         </TooltipProvider>
       </ThemeProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
+      {process.env.NODE_ENV === "development" && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   );
 }

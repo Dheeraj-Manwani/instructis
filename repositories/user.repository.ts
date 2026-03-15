@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/utils/errors";
+import { RoleEnum } from "@prisma/client";
 
 export type UserListItem = {
   id: string;
@@ -7,7 +8,7 @@ export type UserListItem = {
   email: string;
   emailVerified: boolean;
   image: string | null;
-  role: string;
+  role: RoleEnum;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -64,4 +65,80 @@ export async function getUserByIdOrThrow(id: string): Promise<UserListItem> {
     throw new NotFoundError("User not found");
   }
   return user;
+}
+
+export async function updateUserRole(
+  userId: string,
+  newRole: RoleEnum
+): Promise<UserListItem> {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { role: newRole },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      emailVerified: true,
+      image: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  return user;
+}
+
+async function generateRollNo(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `ROLL${year}`;
+
+  // Find the highest roll number for this year
+  const lastStudent = await prisma.student.findFirst({
+    where: {
+      rollNo: {
+        startsWith: prefix,
+      },
+    },
+    orderBy: {
+      rollNo: "desc",
+    },
+  });
+
+  if (!lastStudent) {
+    return `${prefix}001`;
+  }
+
+  const lastNumber = parseInt(lastStudent.rollNo.replace(prefix, ""), 10);
+  const nextNumber = lastNumber + 1;
+  return `${prefix}${String(nextNumber).padStart(3, "0")}`;
+}
+
+export async function createStudentRecord(userId: string) {
+  const rollNo = await generateRollNo();
+  await prisma.student.create({
+    data: {
+      userId,
+      rollNo,
+    },
+  });
+}
+
+export async function createFacultyRecord(userId: string) {
+  await prisma.faculty.create({
+    data: {
+      userId,
+    },
+  });
+}
+
+export async function deleteStudentRecord(userId: string) {
+  await prisma.student.deleteMany({
+    where: { userId },
+  });
+}
+
+export async function deleteFacultyRecord(userId: string) {
+  await prisma.faculty.deleteMany({
+    where: { userId },
+  });
 }

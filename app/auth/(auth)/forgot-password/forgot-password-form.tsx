@@ -12,16 +12,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import {
+  forgotPasswordSchema,
+  type ForgotPasswordValues,
+} from "@/lib/schemas/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-const forgotPasswordSchema = z.object({
-  email: z.email({ message: "Please enter a valid email" }),
-});
-
-type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export function ForgotPasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);

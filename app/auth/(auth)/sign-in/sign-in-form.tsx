@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { signInSchema, SignInValues } from "@/lib/validations/auth.schema";
+import { signInSchema, SignInValues } from "@/lib/schemas/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -170,7 +170,7 @@ export function SignInForm() {
               control={form.control}
               name="rememberMe"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center gap-2.5">
+                <FormItem className="flex flex-row items-center gap-2 space-y-0">
                   <FormControl>
                     <Checkbox
                       checked={field.value}

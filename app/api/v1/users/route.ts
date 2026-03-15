@@ -2,7 +2,7 @@ import { catchAsync } from "@/lib/utils/catchAsync";
 import { withAuth } from "@/lib/middlewares/withAuth";
 import { withRole } from "@/lib/middlewares/withRole";
 import { ApiResponse } from "@/lib/utils/api-response";
-import { paginationQuerySchema } from "@/lib/validations/common.schema";
+import { paginationQuerySchema } from "@/lib/schemas/common.schema";
 import * as userService from "@/services/user.service";
 import { NextRequest } from "next/server";
 

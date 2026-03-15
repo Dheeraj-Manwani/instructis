@@ -1,5 +1,8 @@
 -- CreateEnum
-CREATE TYPE "ExamType" AS ENUM ('JEE', 'NEET', 'BOTH');
+CREATE TYPE "ExamType" AS ENUM ('JEE', 'NEET');
+
+-- CreateEnum
+CREATE TYPE "SubjectEnum" AS ENUM ('PHYSICS', 'CHEMISTRY', 'MATHEMATICS', 'ZOOLOGY', 'BOTANY');
 
 -- CreateEnum
 CREATE TYPE "QuestionType" AS ENUM ('MCQ', 'NUMERICAL', 'MULTI_CORRECT');
@@ -12,6 +15,23 @@ CREATE TYPE "Priority" AS ENUM ('HIGH', 'MEDIUM', 'LOW');
 
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('MARKS_UPLOADED', 'TEST_RESULT', 'RANK_UPDATE', 'WEAK_AREA_ALERT', 'PARENT_NOTIFIED', 'ASSIGNMENT', 'GENERAL');
+
+-- CreateEnum
+CREATE TYPE "RoleEnum" AS ENUM ('USER', 'STUDENT', 'FACULTY', 'ADMIN');
+
+-- CreateTable
+CREATE TABLE "user" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL,
+    "image" TEXT,
+    "role" "RoleEnum" NOT NULL DEFAULT 'USER',
+    "createdAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "Student" (
@@ -33,6 +53,7 @@ CREATE TABLE "Student" (
 CREATE TABLE "Faculty" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "title" TEXT,
     "department" TEXT,
 
     CONSTRAINT "Faculty_pkey" PRIMARY KEY ("id")
@@ -59,20 +80,10 @@ CREATE TABLE "BatchFaculty" (
 );
 
 -- CreateTable
-CREATE TABLE "Subject" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "examType" "ExamType" NOT NULL,
-    "maxMarks" INTEGER NOT NULL DEFAULT 300,
-
-    CONSTRAINT "Subject_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Topic" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "subjectId" TEXT NOT NULL,
+    "subject" "SubjectEnum" NOT NULL,
 
     CONSTRAINT "Topic_pkey" PRIMARY KEY ("id")
 );
@@ -83,7 +94,7 @@ CREATE TABLE "Question" (
     "text" TEXT NOT NULL,
     "type" "QuestionType" NOT NULL DEFAULT 'MCQ',
     "difficulty" "Difficulty" NOT NULL DEFAULT 'MODERATE',
-    "subjectId" TEXT NOT NULL,
+    "subject" "SubjectEnum" NOT NULL,
     "topicId" TEXT,
     "facultyId" TEXT NOT NULL,
     "explanation" TEXT,
@@ -108,11 +119,15 @@ CREATE TABLE "QuestionOption" (
 CREATE TABLE "MockTest" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "examType" "ExamType" NOT NULL,
     "batchId" TEXT,
     "facultyId" TEXT NOT NULL,
     "duration" INTEGER NOT NULL,
     "totalMarks" INTEGER NOT NULL,
+    "totalMarksPhysics" INTEGER,
+    "totalMarksChemistry" INTEGER,
+    "totalMarksMathematics" INTEGER,
+    "totalMarksZoology" INTEGER,
+    "totalMarksBotany" INTEGER,
     "isPublished" BOOLEAN NOT NULL DEFAULT false,
     "scheduledAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -139,6 +154,11 @@ CREATE TABLE "TestAttempt" (
     "mockTestId" TEXT NOT NULL,
     "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "submittedAt" TIMESTAMP(3),
+    "physicsMarks" DOUBLE PRECISION,
+    "chemistryMarks" DOUBLE PRECISION,
+    "mathematicsMarks" DOUBLE PRECISION,
+    "zoologyMarks" DOUBLE PRECISION,
+    "botanyMarks" DOUBLE PRECISION,
     "totalScore" DOUBLE PRECISION,
     "percentile" DOUBLE PRECISION,
     "timeTaken" INTEGER,
@@ -165,7 +185,7 @@ CREATE TABLE "Mark" (
     "id" TEXT NOT NULL,
     "studentId" TEXT NOT NULL,
     "facultyId" TEXT NOT NULL,
-    "subjectId" TEXT NOT NULL,
+    "subject" "SubjectEnum" NOT NULL,
     "testName" TEXT NOT NULL,
     "examType" "ExamType" NOT NULL,
     "marksObtained" DOUBLE PRECISION NOT NULL,
@@ -245,6 +265,54 @@ CREATE TABLE "WhatsAppLog" (
     CONSTRAINT "WhatsAppLog_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "session" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "account" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3),
+    "updatedAt" TIMESTAMP(3),
+
+    CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Student_userId_key" ON "Student"("userId");
 
@@ -255,7 +323,13 @@ CREATE UNIQUE INDEX "Student_rollNo_key" ON "Student"("rollNo");
 CREATE UNIQUE INDEX "Faculty_userId_key" ON "Faculty"("userId");
 
 -- CreateIndex
-CREATE INDEX "Mark_studentId_subjectId_examType_idx" ON "Mark"("studentId", "subjectId", "examType");
+CREATE INDEX "TestAttempt_studentId_mockTestId_idx" ON "TestAttempt"("studentId", "mockTestId");
+
+-- CreateIndex
+CREATE INDEX "Mark_studentId_subject_examType_idx" ON "Mark"("studentId", "subject", "examType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
 
 -- AddForeignKey
 ALTER TABLE "Student" ADD CONSTRAINT "Student_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -271,12 +345,6 @@ ALTER TABLE "BatchFaculty" ADD CONSTRAINT "BatchFaculty_batchId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "BatchFaculty" ADD CONSTRAINT "BatchFaculty_facultyId_fkey" FOREIGN KEY ("facultyId") REFERENCES "Faculty"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Topic" ADD CONSTRAINT "Topic_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Question" ADD CONSTRAINT "Question_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Question" ADD CONSTRAINT "Question_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "Topic"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -318,9 +386,6 @@ ALTER TABLE "Mark" ADD CONSTRAINT "Mark_studentId_fkey" FOREIGN KEY ("studentId"
 ALTER TABLE "Mark" ADD CONSTRAINT "Mark_facultyId_fkey" FOREIGN KEY ("facultyId") REFERENCES "Faculty"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Mark" ADD CONSTRAINT "Mark_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "RankPrediction" ADD CONSTRAINT "RankPrediction_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -337,3 +402,9 @@ ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "WhatsAppLog" ADD CONSTRAINT "WhatsAppLog_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
