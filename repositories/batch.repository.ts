@@ -264,3 +264,37 @@ export async function findBatchesForFaculty(
     createdAt: bf.batch.createdAt,
   }));
 }
+
+export type StudentInBatch = {
+  id: string;
+  rollNo: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+};
+
+export async function findStudentsInBatch(batchId: string): Promise<StudentInBatch[]> {
+  const students = await prisma.student.findMany({
+    where: { batchId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      rollNo: "asc",
+    },
+  });
+
+  return students.map((s) => ({
+    id: s.id,
+    rollNo: s.rollNo,
+    user: s.user,
+  }));
+}

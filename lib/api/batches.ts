@@ -110,3 +110,20 @@ export async function fetchMyBatches(): Promise<BatchListItem[]> {
   };
   return res.data ?? [];
 }
+
+export type StudentInBatch = {
+  id: string;
+  rollNo: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+};
+
+export async function fetchStudentsInBatch(batchId: string): Promise<StudentInBatch[]> {
+  const res = (await api.get(`/batches/${batchId}/students-list`)) as {
+    data: StudentInBatch[];
+  };
+  return res.data ?? [];
+}

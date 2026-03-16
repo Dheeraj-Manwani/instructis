@@ -26,3 +26,8 @@ export async function updateMockTest(testId: string, data: mockTestRepository.Up
     await mockTestRepository.getTestByIdOrThrow(testId);
     return mockTestRepository.updateMockTest(testId, data);
 }
+
+export async function createOrUpdateTestAttempt(data: mockTestRepository.CreateTestAttemptInput) {
+    await mockTestRepository.getTestByIdOrThrow(data.mockTestId);
+    return mockTestRepository.createOrUpdateTestAttempt(data);
+}

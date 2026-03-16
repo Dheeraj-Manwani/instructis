@@ -191,3 +191,125 @@ export async function updateMockTest(testId: string, data: UpdateMockTestInput):
 
     return test;
 }
+
+export type CreateTestAttemptInput = {
+    studentId: string;
+    mockTestId: string;
+    physicsMarks?: number | null;
+    chemistryMarks?: number | null;
+    mathematicsMarks?: number | null;
+    zoologyMarks?: number | null;
+    botanyMarks?: number | null;
+    totalScore?: number | null;
+    percentile?: number | null;
+    submittedAt?: Date | null;
+};
+
+export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): Promise<TestAttemptListItem> {
+    // Check if attempt already exists
+    const existing = await prisma.testAttempt.findFirst({
+        where: {
+            studentId: data.studentId,
+            mockTestId: data.mockTestId,
+        },
+    });
+
+    if (existing) {
+        // Update existing attempt
+        const attempt = await prisma.testAttempt.update({
+            where: { id: existing.id },
+            data: {
+                physicsMarks: data.physicsMarks,
+                chemistryMarks: data.chemistryMarks,
+                mathematicsMarks: data.mathematicsMarks,
+                zoologyMarks: data.zoologyMarks,
+                botanyMarks: data.botanyMarks,
+                totalScore: data.totalScore,
+                percentile: data.percentile,
+                submittedAt: data.submittedAt || existing.submittedAt,
+            },
+            include: {
+                student: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return {
+            id: attempt.id,
+            studentId: attempt.studentId,
+            student: {
+                id: attempt.student.id,
+                rollNo: attempt.student.rollNo,
+                user: attempt.student.user,
+            },
+            startedAt: attempt.startedAt,
+            submittedAt: attempt.submittedAt,
+            physicsMarks: attempt.physicsMarks,
+            chemistryMarks: attempt.chemistryMarks,
+            mathematicsMarks: attempt.mathematicsMarks,
+            zoologyMarks: attempt.zoologyMarks,
+            botanyMarks: attempt.botanyMarks,
+            totalScore: attempt.totalScore,
+            percentile: attempt.percentile,
+            timeTaken: attempt.timeTaken,
+        };
+    } else {
+        // Create new attempt
+        const attempt = await prisma.testAttempt.create({
+            data: {
+                studentId: data.studentId,
+                mockTestId: data.mockTestId,
+                physicsMarks: data.physicsMarks,
+                chemistryMarks: data.chemistryMarks,
+                mathematicsMarks: data.mathematicsMarks,
+                zoologyMarks: data.zoologyMarks,
+                botanyMarks: data.botanyMarks,
+                totalScore: data.totalScore,
+                percentile: data.percentile,
+                submittedAt: data.submittedAt,
+            },
+            include: {
+                student: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return {
+            id: attempt.id,
+            studentId: attempt.studentId,
+            student: {
+                id: attempt.student.id,
+                rollNo: attempt.student.rollNo,
+                user: attempt.student.user,
+            },
+            startedAt: attempt.startedAt,
+            submittedAt: attempt.submittedAt,
+            physicsMarks: attempt.physicsMarks,
+            chemistryMarks: attempt.chemistryMarks,
+            mathematicsMarks: attempt.mathematicsMarks,
+            zoologyMarks: attempt.zoologyMarks,
+            botanyMarks: attempt.botanyMarks,
+            totalScore: attempt.totalScore,
+            percentile: attempt.percentile,
+            timeTaken: attempt.timeTaken,
+        };
+    }
+}

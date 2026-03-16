@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
+import { useParams } from "next/navigation";
 import {
     Card,
     CardContent,

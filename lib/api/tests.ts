@@ -96,3 +96,22 @@ export async function fetchTestAttempts(testId: string): Promise<TestAttemptList
     };
     return res.data ?? [];
 }
+
+export type CreateTestAttemptPayload = {
+    studentId: string;
+    physicsMarks?: number | null;
+    chemistryMarks?: number | null;
+    mathematicsMarks?: number | null;
+    zoologyMarks?: number | null;
+    botanyMarks?: number | null;
+    totalScore?: number | null;
+    percentile?: number | null;
+    submittedAt?: string | null;
+};
+
+export async function createTestAttempt(testId: string, payload: CreateTestAttemptPayload): Promise<TestAttemptListItem> {
+    const res = (await api.post(`/tests/${testId}/attempts`, payload)) as {
+        data: TestAttemptListItem;
+    };
+    return res.data;
+}

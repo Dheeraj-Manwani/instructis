@@ -76,3 +76,8 @@ export async function getFacultiesNotInBatch(batchId: string) {
 export async function getBatchesForFaculty(facultyUserId: string) {
   return batchRepository.findBatchesForFaculty(facultyUserId);
 }
+
+export async function getStudentsInBatch(batchId: string) {
+  await batchRepository.getBatchByIdOrThrow(batchId);
+  return batchRepository.findStudentsInBatch(batchId);
+}
