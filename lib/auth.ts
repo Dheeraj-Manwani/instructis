@@ -24,6 +24,23 @@ export const auth = betterAuth({
             role: user.role ?? RoleEnum.FACULTY,
           },
         }),
+        after: async (createdUser) => {
+          try {
+            if (createdUser.role === RoleEnum.FACULTY) {
+              // Ensure a matching faculty record exists for newly created faculty users
+              await prisma.faculty.upsert({
+                where: { userId: createdUser.id },
+                update: {},
+                create: {
+                  userId: createdUser.id,
+                },
+              });
+            }
+          } catch (error) {
+            // Swallow errors here to avoid blocking auth flow; they can be handled separately if needed
+            console.error("Failed to ensure faculty record for user", createdUser.id, error);
+          }
+        },
       },
     },
   },
