@@ -70,30 +70,45 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
       {/* ════════ NAVBAR ════════ */}
       <nav
         className={cn(
-          "fixed top-0 inset-x-0 z-50 transition-all duration-300",
-          scrolled ? "bg-white/80 backdrop-blur-xl shadow-lg shadow-black/5" : "bg-transparent"
+          "fixed top-0 inset-x-0 z-50 border-b border-border transition-all duration-300",
+          scrolled ? "bg-background/90 backdrop-blur-xl shadow-lg shadow-black/5" : "bg-background/80"
         )}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-emerald-500/25 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-transparent flex items-center justify-center overflow-hidden">
               <Image
                 src={appLogo}
                 alt="Instructis"
                 className="h-8 w-8 object-contain"
               />
             </div>
-            <span className="text-xl font-extrabold tracking-tight">Instructis</span>
+            <span className="text-xl font-extrabold tracking-tight text-foreground">Instructis</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Features</a>
-            <a href="#institutes" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">For Institutes</a>
-            <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Pricing</a>
+            <a
+              href="#features"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Features
+            </a>
+            <a
+              href="#institutes"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              For Institutes
+            </a>
+            <a
+              href="#pricing"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pricing
+            </a>
             <Link href="/batches">
               <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-105 transition-all duration-300">
                 Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
@@ -125,10 +140,10 @@ export default function LandingPage() {
       {/* ════════ HERO ════════ */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
         {/* mesh gradient bg */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full bg-emerald-200/40 blur-[120px] animate-pulse" />
-          <div className="absolute top-20 right-0 w-[500px] h-[500px] rounded-full bg-blue-200/30 blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
-          <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-amber-100/30 blur-[100px] animate-pulse" style={{ animationDelay: "2s" }} />
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <div className="absolute top-0 left-0 w-[520px] h-[520px] rounded-full bg-emerald-500/10 blur-[120px]" />
+          <div className="absolute top-20 right-0 w-[480px] h-[480px] rounded-full bg-blue-500/10 blur-[120px]" />
+          <div className="absolute bottom-0 left-1/3 w-[380px] h-[380px] rounded-full bg-amber-400/10 blur-[100px]" />
         </div>
 
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-5 gap-12 items-center">
@@ -530,7 +545,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-10 mb-12">
             <div className="md:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center overflow-hidden">
                   <Image
                     src={appLogo}
                     alt="Instructis"
