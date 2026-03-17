@@ -1,7 +1,9 @@
-import { ForbiddenError } from "@/lib/utils/errors";
+import { ForbiddenError, NotFoundError } from "@/lib/utils/errors";
 import * as userRepository from "@/repositories/user.repository";
 import type { PaginationMeta } from "@/types";
 import { RoleEnum } from "@prisma/client";
+
+export type Profile = userRepository.Profile;
 
 export type ListUsersResult = {
   data: userRepository.UserListItem[];
@@ -61,4 +63,68 @@ export async function updateUserRole(
   // USER and ADMIN roles don't need additional records
 
   return updatedUser;
+}
+
+export async function getProfile(userId: string): Promise<Profile> {
+  const profile = await userRepository.findProfileByUserId(userId);
+  if (!profile) {
+    throw new NotFoundError("Profile not found");
+  }
+  return profile;
+}
+
+export type UpdateProfileInput = {
+  name?: string;
+  image?: string | null;
+  student?: {
+    rollNo?: string;
+    targetExam?: "JEE" | "NEET";
+    batchId?: string | null;
+    parentName?: string | null;
+    parentPhone?: string | null;
+    parentEmail?: string | null;
+    address?: string | null;
+    dob?: string | null;
+  };
+  faculty?: {
+    title?: string | null;
+    department?: string | null;
+  };
+};
+
+export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<Profile> {
+  const user = await userRepository.getUserByIdOrThrow(userId);
+  const role = user.role;
+
+  if (input.name != null || input.image !== undefined) {
+    await userRepository.updateUserProfile(userId, {
+      name: input.name,
+      image: input.image,
+    });
+  }
+
+  if (role === RoleEnum.STUDENT && input.student) {
+    const dob = input.student.dob != null && input.student.dob !== "" ? new Date(input.student.dob) : null;
+    await userRepository.updateStudentByUserId(userId, {
+      rollNo: input.student.rollNo,
+      targetExam: input.student.targetExam as "JEE" | "NEET" | undefined,
+      batchId: input.student.batchId,
+      parentName: input.student.parentName,
+      parentPhone: input.student.parentPhone,
+      parentEmail: input.student.parentEmail,
+      address: input.student.address,
+      dob,
+    });
+  }
+
+  if (role === RoleEnum.FACULTY && input.faculty) {
+    await userRepository.updateFacultyByUserId(userId, {
+      title: input.faculty.title,
+      department: input.faculty.department,
+    });
+  }
+
+  const updated = await userRepository.findProfileByUserId(userId);
+  if (!updated) throw new NotFoundError("Profile not found");
+  return updated;
 }

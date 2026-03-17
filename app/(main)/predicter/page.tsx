@@ -1,12 +1,16 @@
 "use client";
 
-import { students, performanceTrend, getPercentileBg } from "@/data/dummy";
-import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Target, Zap, BookOpen, Star, Trophy, Medal, FileDown, Share2, ChevronRight, Download, Users, Award, BellRing } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useState } from "react";
+import { TrendingUp, Trophy, Medal, FileDown, Share2, ChevronRight, Download, Users, Award, BellRing } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const student = students[0];
-const total = student.marks.math + student.marks.physics + student.marks.chemistry;
+import { cn } from "@/lib/utils";
+import { performanceTrend } from "@/data/dummy";
+import { fetchMyBatches, fetchStudentsInBatch, type BatchListItem, type StudentInBatch } from "@/lib/api/batches";
+import { api } from "@/lib/api/axios";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import LoadingButton from "@/components/LoadingButton";
 
 const weakAreas = [
     { topic: "Thermodynamics", drawback: 12, questions: 15 },
@@ -22,23 +26,164 @@ const tips = [
     { priority: "Medium", tip: "Organic Chemistry", color: "text-warning" },
 ];
 
+type AIRankResult = {
+    rankRecord: {
+        percentile: number;
+        predictedRank: number;
+        improvementPts: number;
+    };
+    ai: {
+        summary: string;
+        reasoning: string;
+        nextScoreEstimate: {
+            expectedPercentile: number | null;
+            expectedTotalScore: number | null;
+            confidenceNote: string;
+        };
+    };
+    student: {
+        id: string;
+        rollNo: string;
+        name: string;
+        email: string;
+    };
+    batch: BatchListItem;
+    history: Array<{
+        testName: string;
+        date: string;
+        totalScore: number | null;
+        percentile: number | null;
+    }>;
+};
+
 export default function AIRankPredictor() {
+    const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+    const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+    const [aiResult, setAiResult] = useState<AIRankResult | null>(null);
+
+    const { data: batchesData } = useQuery({
+        queryKey: ["my-batches"],
+        queryFn: () => fetchMyBatches(),
+    });
+
+    const { data: studentsData, isLoading: isStudentsLoading } = useQuery({
+        queryKey: ["students-in-batch", selectedBatchId],
+        queryFn: () => fetchStudentsInBatch(selectedBatchId),
+        enabled: !!selectedBatchId,
+    });
+
+    const analyzeMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedBatchId || !selectedStudentId) {
+                throw new Error("Please select both batch and student");
+            }
+            const res = (await api.post("/ai-rank", {
+                batchId: selectedBatchId,
+                studentId: selectedStudentId,
+            })) as { data: AIRankResult };
+            return res.data;
+        },
+        onSuccess: (data) => {
+            setAiResult(data);
+        },
+        onError: (error: any) => {
+            toast.error(error?.message || "Failed to analyze with AI");
+        },
+    });
+
+    const notifyMutation = useMutation({
+        mutationFn: async () => {
+            if (!aiResult) throw new Error("No AI result to share");
+            const res = (await api.post("/ai-rank/notify", {
+                batchId: aiResult.batch.id,
+                studentId: aiResult.student.id,
+                aiSummary: aiResult.ai.summary,
+            })) as { message?: string };
+            return res;
+        },
+        onSuccess: (res) => {
+            toast.success(res?.message || "Shared with parent on WhatsApp");
+        },
+        onError: (error: any) => {
+            toast.error(error?.message || "Failed to share with parent");
+        },
+    });
+
+    const studentName =
+        aiResult?.student.name ||
+        studentsData?.find((s) => s.id === selectedStudentId)?.user.name ||
+        "Student";
+
+    const currentPercentile = aiResult?.rankRecord.percentile ?? 0;
+    const currentRank = aiResult?.rankRecord.predictedRank ?? 0;
+    const improvement = aiResult?.rankRecord.improvementPts ?? 0;
+
     return (
         <div className="space-y-5">
             {/* Top controls */}
             <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm text-muted-foreground mr-auto">AI Based JEE / NEET Rank Estimate + <span className="underline font-medium text-foreground">Improvement Plan</span></p>
+                <p className="text-sm text-muted-foreground mr-auto">
+                    AI Based JEE / NEET Rank Estimate +{" "}
+                    <span className="underline font-medium text-foreground">Improvement Plan</span>
+                </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-foreground">Select Student:</span>
-                <select className="rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground focus:border-primary focus:outline-none">
-                    {students.map((s) => <option key={s.id}>{s.name}</option>)}
-                </select>
-                <div className="flex rounded-md overflow-hidden border border-border ml-auto">
-                    <button className="bg-jee px-5 py-2 text-xs font-bold text-white">JEE</button>
-                    <button className="bg-card px-5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground border-l border-border">NEET</button>
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-foreground">Batch</span>
+                    <select
+                        className="min-w-[200px] rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground focus:border-primary focus:outline-none"
+                        value={selectedBatchId}
+                        onChange={(e) => {
+                            setSelectedBatchId(e.target.value);
+                            setSelectedStudentId("");
+                            setAiResult(null);
+                        }}
+                    >
+                        <option value="">Select batch</option>
+                        {batchesData?.map((b) => (
+                            <option key={b.id} value={b.id}>
+                                {b.name} ({b.examType})
+                            </option>
+                        ))}
+                    </select>
                 </div>
+
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-foreground">Student</span>
+                    <select
+                        className="min-w-[220px] rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+                        value={selectedStudentId}
+                        onChange={(e) => {
+                            setSelectedStudentId(e.target.value);
+                            setAiResult(null);
+                        }}
+                        disabled={!selectedBatchId || isStudentsLoading}
+                    >
+                        <option value="">
+                            {selectedBatchId
+                                ? isStudentsLoading
+                                    ? "Loading students..."
+                                    : "Select student"
+                                : "Select batch first"}
+                        </option>
+                        {studentsData?.map((s) => (
+                            <option key={s.id} value={s.id}>
+                                {s.user.name} (Roll: {s.rollNo})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <LoadingButton
+                    className="ml-auto"
+                    size="sm"
+                    onClick={() => analyzeMutation.mutate()}
+                    loading={analyzeMutation.isPending}
+                    disabled={!selectedBatchId || !selectedStudentId}
+                >
+                    Analyze with AI
+                </LoadingButton>
             </div>
 
             {/* Metrics */}
@@ -52,17 +197,27 @@ export default function AIRankPredictor() {
                         <p className="text-2xl font-bold font-mono text-foreground">245 <span className="text-sm font-normal text-muted-foreground">/ 300</span></p>
                     </div>
                     <div className="p-4">
-                        <p className="text-xs text-muted-foreground">Percentile</p>
-                        <p className="text-2xl font-bold font-mono text-primary">{student.jeePercentile}%</p>
-                        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-success"><TrendingUp size={10} /> -4.2%</span>
+                        <p className="text-xs text-muted-foreground">Predicted Percentile</p>
+                        <p className="text-2xl font-bold font-mono text-primary">
+                            {currentPercentile ? currentPercentile.toFixed(2) : "--"}%
+                        </p>
+                        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-success">
+                            <TrendingUp size={10} /> {improvement >= 0 ? "+" : ""}
+                            {improvement.toFixed(1)} pts vs last
+                        </span>
                     </div>
                     <div className="p-4">
-                        <p className="text-xs text-muted-foreground">Current Rank</p>
-                        <p className="text-2xl font-bold font-mono text-foreground">{student.jeeRank.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Predicted Rank</p>
+                        <p className="text-2xl font-bold font-mono text-foreground">
+                            {currentRank ? currentRank.toLocaleString() : "--"}
+                        </p>
                     </div>
                     <div className="p-4">
-                        <p className="text-xs text-muted-foreground">Improvement</p>
-                        <p className="text-2xl font-bold font-mono text-success">+{student.improvement} Points</p>
+                        <p className="text-xs text-muted-foreground">Expected Improvement</p>
+                        <p className="text-2xl font-bold font-mono text-success">
+                            {improvement >= 0 ? "+" : ""}
+                            {improvement.toFixed(1)} pts
+                        </p>
                     </div>
                 </div>
             </div>
@@ -81,14 +236,14 @@ export default function AIRankPredictor() {
                             </div>
                             <div
                                 className="absolute -top-8 flex flex-col items-center transition-all duration-700"
-                                style={{ left: `${student.jeePercentile}%`, transform: "translateX(-50%)" }}
+                                style={{ left: `${currentPercentile || 0}%`, transform: "translateX(-50%)" }}
                             >
                                 <span className="rounded-md bg-foreground px-2.5 py-1 text-[10px] font-bold text-background whitespace-nowrap">You are here</span>
                                 <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-foreground" />
                             </div>
                             <div
                                 className="absolute top-0 h-5 flex items-center"
-                                style={{ left: `${student.jeePercentile}%`, transform: "translateX(-50%)" }}
+                                style={{ left: `${currentPercentile || 0}%`, transform: "translateX(-50%)" }}
                             >
                                 <div className="h-7 w-7 rounded-full border-3 border-card bg-primary shadow-lg animate-pulse" />
                             </div>
@@ -114,8 +269,15 @@ export default function AIRankPredictor() {
                                     <Trophy size={24} className="text-warning" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-muted-foreground">Target: <span className="font-bold text-foreground">95-99%ile</span></p>
-                                    <p className="text-sm text-muted-foreground">Expected Rank: <span className="text-xl font-extrabold text-destructive">Top 1,000</span></p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Target: <span className="font-bold text-foreground">High Performance</span>
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Expected Rank:{" "}
+                                        <span className="text-xl font-extrabold text-destructive">
+                                            {currentRank ? `Top ${currentRank.toLocaleString()}` : "--"}
+                                        </span>
+                                    </p>
                                 </div>
                                 <ChevronRight size={16} className="text-muted-foreground" />
                             </div>
@@ -124,8 +286,14 @@ export default function AIRankPredictor() {
                                     <Medal size={24} className="text-success" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-muted-foreground">Target: <span className="font-bold text-foreground">90-95%ile</span></p>
-                                    <p className="text-sm text-muted-foreground">Expected Rank: <span className="text-xl font-extrabold text-destructive">Top 3,000</span></p>
+                                    <p className="text-xs text-muted-foreground">
+                                        AI Confidence
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        <span className="text-xs text-muted-foreground">
+                                            {aiResult?.ai.nextScoreEstimate.confidenceNote || "Run AI analysis to view confidence"}
+                                        </span>
+                                    </p>
                                 </div>
                                 <ChevronRight size={16} className="text-muted-foreground" />
                             </div>
@@ -179,27 +347,28 @@ export default function AIRankPredictor() {
                     {/* AI Tips */}
                     <div className="rounded-lg border border-border bg-card p-4 card-shadow">
                         <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
-                            ⭐ AI Improvement Tips
+                            ⭐ AI Thoughts
                         </h3>
-                        <p className="text-xs text-muted-foreground mb-2">
-                            Focus on weak areas to gain <span className="font-bold text-success">+35 points</span>
+                        <p className="text-xs text-muted-foreground mb-2 whitespace-pre-line">
+                            {aiResult
+                                ? aiResult.ai.summary
+                                : "Select a batch and student, then click \"Analyze with AI\" to view personalized insights here."}
                         </p>
                         <div className="h-2 rounded-full bg-muted overflow-hidden mb-4">
                             <div className="h-full rounded-full bg-gradient-to-r from-success to-primary" style={{ width: "65%" }} />
                         </div>
-                        <div className="space-y-3">
-                            {tips.map((t, i) => (
-                                <div key={i} className="flex items-center gap-2 text-xs">
-                                    <span className={cn("inline-block h-3 w-3 rounded-sm", t.priority === "High" ? "bg-success" : "bg-warning")} />
-                                    <span className="text-foreground font-medium">{t.tip}</span>
-                                    <span className="text-[10px] ml-auto">–</span>
-                                    <span className={cn("text-[10px] font-semibold", t.color)}>{t.priority} Priority</span>
-                                </div>
-                            ))}
+                        <div className="space-y-3 text-xs text-muted-foreground whitespace-pre-line">
+                            {aiResult ? aiResult.ai.reasoning : "Once AI runs, detailed reasoning and guidance will appear here."}
                         </div>
-                        <button className="w-full mt-4 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
-                            Generate Study Plan
-                        </button>
+                        <LoadingButton
+                            className="w-full mt-4 flex items-center justify-center gap-2"
+                            size="sm"
+                            onClick={() => notifyMutation.mutate()}
+                            loading={notifyMutation.isPending}
+                            disabled={!aiResult}
+                        >
+                            Share with Parent (WhatsApp)
+                        </LoadingButton>
                     </div>
 
                     {/* Performance Trend chart */}
@@ -238,10 +407,24 @@ export default function AIRankPredictor() {
 
             {/* Footer */}
             <div className="flex flex-wrap items-center gap-6 rounded-lg border border-border bg-card p-4 card-shadow text-sm">
-                <span className="flex items-center gap-1.5"><Users size={14} className="text-muted-foreground" /> Students: <strong>120</strong></span>
-                <span className="flex items-center gap-1.5"><TrendingUp size={14} className="text-muted-foreground" /> Avg. Marks: <strong>218 / 300</strong></span>
-                <span className="flex items-center gap-1.5"><Award size={14} className="text-muted-foreground" /> Highest Percentile: <strong className="text-primary">98.7%</strong></span>
-                <span className="flex items-center gap-1.5"><BellRing size={14} className="text-muted-foreground" /> Parents Notified</span>
+                <span className="flex items-center gap-1.5">
+                    <Users size={14} className="text-muted-foreground" /> Students in batch:{" "}
+                    <strong>{studentsData?.length ?? 0}</strong>
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-muted-foreground" /> Selected Student:{" "}
+                    <strong>{studentName}</strong>
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <Award size={14} className="text-muted-foreground" /> Predicted Percentile:{" "}
+                    <strong className="text-primary">
+                        {currentPercentile ? currentPercentile.toFixed(2) : "--"}%
+                    </strong>
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <BellRing size={14} className="text-muted-foreground" /> WhatsApp Share:{" "}
+                    <strong>{notifyMutation.isSuccess ? "Sent / Attempted" : "Not sent"}</strong>
+                </span>
             </div>
         </div>
     );

@@ -249,3 +249,14 @@ export async function updateQuestion(
 export async function deleteQuestion(id: string): Promise<void> {
   await prisma.question.delete({ where: { id } });
 }
+
+/**
+ * Returns true if the question is used in any test (mock test definition or student answers).
+ */
+export async function isQuestionUsedInTests(id: string): Promise<boolean> {
+  const [mockTestQuestionCount, studentAnswerCount] = await Promise.all([
+    prisma.mockTestQuestion.count({ where: { questionId: id } }),
+    prisma.studentAnswer.count({ where: { questionId: id } }),
+  ]);
+  return mockTestQuestionCount > 0 || studentAnswerCount > 0;
+}

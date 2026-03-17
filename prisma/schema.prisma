@@ -226,6 +226,8 @@ model TestAttempt {
   percentile       Float?
   timeTaken        Int?
 
+  isNotified Boolean @default(false)
+
   answers StudentAnswer[]
 
   @@index([studentId, mockTestId])

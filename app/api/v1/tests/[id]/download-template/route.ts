@@ -2,22 +2,22 @@ import { catchAsync } from "@/lib/utils/catchAsync";
 import { withAuth } from "@/lib/middlewares/withAuth";
 import { withRole } from "@/lib/middlewares/withRole";
 import { ApiResponse } from "@/lib/utils/api-response";
+import { testIdParamSchema } from "@/lib/schemas/mock-test.schema";
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { ExamType } from "@prisma/client";
 import * as mockTestService from "@/services/mock-test.service";
 import * as batchRepository from "@/repositories/batch.repository";
-import { z } from "zod";
-
-const testIdParamSchema = z.object({
-    id: z.string().min(1, "Test ID is required"),
-});
+import * as batchService from "@/services/batch.service";
 
 export const GET = catchAsync(async (req: NextRequest, { params }) => {
     const session = await withAuth(req);
     withRole(session, "FACULTY", "ADMIN");
 
     const { id: testId } = testIdParamSchema.parse(await params);
+
+    // const includeStudentsParam = req.nextUrl.searchParams.get("includeStudents");
+    // const includeStudents = includeStudentsParam !== "false";
 
     // Fetch test data to get batch info and marks
     // Note: getTestById returns MockTestListItem but actually includes subject marks
@@ -108,6 +108,21 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
         const cellH4 = worksheet.getCell("H4");
         cellH4.value = `Total / ${totalMarks} marks`;
     }
+
+    // if (includeStudents) {
+    // Pre-fill student roll numbers and names for this batch
+    const students = await batchService.getStudentsInBatch(test.batchId);
+    const maxStudents = 100;
+    const startRow = 6; // row 6 is the first student row
+
+    students.slice(0, maxStudents).forEach((student, index) => {
+        const rowNumber = startRow + index;
+        const row = worksheet.getRow(rowNumber);
+        // Column B: Roll No, Column C: Student Name
+        row.getCell(2).value = student.rollNo;
+        row.getCell(3).value = student.user.name;
+    });
+    // }
 
     // Generate Excel buffer
     const buffer = await workbook.xlsx.writeBuffer();

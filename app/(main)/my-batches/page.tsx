@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "nextjs-toploader/app";
 import Link from "next/link";
+import { useBreadcrumb } from "@/store/BreadcrumbContext";
 import {
     Card,
     CardContent,
@@ -26,6 +28,11 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 export default function MyBatchesPage() {
     const router = useRouter();
+    const { setBreadcrumb } = useBreadcrumb();
+
+    useEffect(() => {
+        setBreadcrumb([{ label: "My Batches" }]);
+    }, [setBreadcrumb]);
 
     const { data: batches = [], isLoading } = useQuery({
         queryKey: ["my-batches"],

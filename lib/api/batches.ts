@@ -41,6 +41,13 @@ export async function fetchBatchById(id: string): Promise<BatchListItem> {
   return res.data;
 }
 
+export async function downloadStudentFacultyTemplate(): Promise<string> {
+  const res = (await api.get("/batches/student-faculty-template")) as {
+    data: { url: string };
+  };
+  return res.data.url;
+}
+
 export type CreateBatchPayload = {
   name: string;
   examType: string;
@@ -104,6 +111,15 @@ export async function addFacultiesToBatch(
   await api.post(`/batches/${batchId}/faculties`, { facultyIds });
 }
 
+export type FacultyInBatch = {
+  id: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+};
+
 export async function fetchMyBatches(): Promise<BatchListItem[]> {
   const res = (await api.get("/batches/my-batches")) as {
     data: BatchListItem[];
@@ -126,4 +142,41 @@ export async function fetchStudentsInBatch(batchId: string): Promise<StudentInBa
     data: StudentInBatch[];
   };
   return res.data ?? [];
+}
+
+export async function fetchFacultiesInBatch(
+  batchId: string
+): Promise<FacultyInBatch[]> {
+  const res = (await api.get(`/batches/${batchId}/faculties-list`)) as {
+    data: FacultyInBatch[];
+  };
+  return res.data ?? [];
+}
+
+export type BulkImportResult = {
+  studentsImported: number;
+  facultyImported: number;
+};
+
+export type BulkImportErrorDetail = {
+  row: number;
+  field: string;
+  reason: string;
+};
+
+export async function bulkImportStudentsAndFaculty(
+  file: File,
+  batchId?: string
+): Promise<BulkImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (batchId) {
+    formData.append("batchId", batchId);
+  }
+
+  const res = (await api.post("/batches/bulk-import", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })) as { data: BulkImportResult };
+
+  return res.data;
 }

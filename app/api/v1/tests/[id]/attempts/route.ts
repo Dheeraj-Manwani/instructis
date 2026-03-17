@@ -3,25 +3,9 @@ import { withAuth } from "@/lib/middlewares/withAuth";
 import { withRole } from "@/lib/middlewares/withRole";
 import { withValidation } from "@/lib/middlewares/withValidation";
 import { ApiResponse } from "@/lib/utils/api-response";
+import { testIdParamSchema, createTestAttemptBodySchema, deleteTestAttemptsBodySchema } from "@/lib/schemas/mock-test.schema";
 import * as mockTestService from "@/services/mock-test.service";
 import { NextRequest } from "next/server";
-import { z } from "zod";
-
-const testIdParamSchema = z.object({
-    id: z.string().min(1, "Test ID is required"),
-});
-
-const createTestAttemptBodySchema = z.object({
-    studentId: z.string().min(1, "Student ID is required"),
-    physicsMarks: z.coerce.number().optional().nullable(),
-    chemistryMarks: z.coerce.number().optional().nullable(),
-    mathematicsMarks: z.coerce.number().optional().nullable(),
-    zoologyMarks: z.coerce.number().optional().nullable(),
-    botanyMarks: z.coerce.number().optional().nullable(),
-    totalScore: z.coerce.number().optional().nullable(),
-    percentile: z.coerce.number().optional().nullable(),
-    submittedAt: z.string().datetime().optional().nullable(),
-});
 
 export const GET = catchAsync(async (req: NextRequest, { params }) => {
     const session = await withAuth(req);
@@ -55,4 +39,21 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
     });
 
     return ApiResponse.created(attempt, "Test attempt saved");
+});
+
+export const DELETE = catchAsync(async (req: NextRequest, { params }) => {
+    const session = await withAuth(req);
+    withRole(session, "FACULTY", "ADMIN");
+
+    const { id } = testIdParamSchema.parse(await params);
+    const body = await withValidation(req, deleteTestAttemptsBodySchema);
+
+    const deletedCount = await mockTestService.deleteTestAttempts(id, body.attemptIds);
+
+    return ApiResponse.success(
+        {
+            deletedCount,
+        },
+        deletedCount > 0 ? "Test attempts deleted successfully" : "No test attempts were deleted"
+    );
 });

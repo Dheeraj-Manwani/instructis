@@ -81,3 +81,8 @@ export async function getStudentsInBatch(batchId: string) {
   await batchRepository.getBatchByIdOrThrow(batchId);
   return batchRepository.findStudentsInBatch(batchId);
 }
+
+export async function getFacultiesInBatch(batchId: string) {
+  await batchRepository.getBatchByIdOrThrow(batchId);
+  return batchRepository.findFacultiesInBatch(batchId);
+}

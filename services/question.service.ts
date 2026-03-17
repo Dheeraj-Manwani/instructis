@@ -1,5 +1,5 @@
 import { Difficulty, QuestionType, SubjectEnum, RoleEnum } from "@prisma/client";
-import { ForbiddenError } from "@/lib/utils/errors";
+import { ForbiddenError, ValidationError } from "@/lib/utils/errors";
 import * as facultyRepository from "@/repositories/faculty.repository";
 import * as questionRepository from "@/repositories/question.repository";
 import type { PaginationMeta } from "@/types";
@@ -106,6 +106,10 @@ export async function updateQuestion(
   if (!isAdmin && !isOwn) {
     throw new ForbiddenError("You can only edit your own questions");
   }
+  const isUsed = await questionRepository.isQuestionUsedInTests(id);
+  if (isUsed) {
+    throw new ValidationError("This question is already used in one or more tests and cannot be updated.");
+  }
   return questionRepository.updateQuestion(id, data);
 }
 
@@ -119,5 +123,9 @@ export async function deleteQuestion(
   if (!isAdmin && !isOwn) {
     throw new ForbiddenError("You can only delete your own questions");
   }
+   const isUsed = await questionRepository.isQuestionUsedInTests(id);
+   if (isUsed) {
+     throw new ValidationError("This question is already used in one or more tests and cannot be deleted.");
+   }
   await questionRepository.deleteQuestion(id);
 }

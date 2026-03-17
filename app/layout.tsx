@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import fullLogo from "@/assets/full_logo.png";
+import appLogo from "@/assets/logo.png";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +18,36 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Instructis",
   description: "Instructis analytics dashboard",
+  metadataBase: process.env.NEXT_PUBLIC_APP_URL
+    ? new URL(process.env.NEXT_PUBLIC_APP_URL)
+    : undefined,
+  manifest: "/assets/site.webmanifest",
+  icons: {
+    icon: appLogo.src,
+    shortcut: appLogo.src,
+    apple: appLogo.src,
+  },
+  openGraph: {
+    title: "Instructis",
+    description: "Instructis analytics dashboard",
+    url: "/",
+    siteName: "Instructis",
+    images: [
+      {
+        url: fullLogo.src,
+        width: 1200,
+        height: 630,
+        alt: "Instructis",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Instructis",
+    description: "Instructis analytics dashboard",
+    images: [fullLogo.src],
+  },
 };
 
 export default function RootLayout({

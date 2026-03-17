@@ -21,7 +21,7 @@ export const auth = betterAuth({
         before: async (user) => ({
           data: {
             ...user,
-            role: user.role ?? RoleEnum.USER,
+            role: user.role ?? RoleEnum.FACULTY,
           },
         }),
       },
@@ -73,7 +73,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         input: false,
-        defaultValue: RoleEnum.USER,
+        defaultValue: RoleEnum.FACULTY,
       },
     },
   },

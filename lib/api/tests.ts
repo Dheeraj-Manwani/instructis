@@ -88,6 +88,7 @@ export type TestAttemptListItem = {
     totalScore: number | null;
     percentile: number | null;
     timeTaken: number | null;
+    isNotified: boolean;
 };
 
 export async function fetchTestAttempts(testId: string): Promise<TestAttemptListItem[]> {
@@ -112,6 +113,24 @@ export type CreateTestAttemptPayload = {
 export async function createTestAttempt(testId: string, payload: CreateTestAttemptPayload): Promise<TestAttemptListItem> {
     const res = (await api.post(`/tests/${testId}/attempts`, payload)) as {
         data: TestAttemptListItem;
+    };
+    return res.data;
+}
+
+export async function notifyTestAttempt(testId: string, attemptId: string): Promise<TestAttemptListItem> {
+    const res = (await api.post(`/tests/${testId}/attempts/${attemptId}/notify`)) as {
+        data: TestAttemptListItem;
+    };
+    return res.data;
+}
+
+export async function deleteTestAttempts(testId: string, attemptIds: string[]): Promise<{ deletedCount: number }> {
+    const res = (await api.delete(`/tests/${testId}/attempts`, {
+        data: { attemptIds },
+    })) as {
+        data: {
+            deletedCount: number;
+        };
     };
     return res.data;
 }

@@ -3,14 +3,9 @@ import { withAuth } from "@/lib/middlewares/withAuth";
 import { withRole } from "@/lib/middlewares/withRole";
 import { withValidation } from "@/lib/middlewares/withValidation";
 import { ApiResponse } from "@/lib/utils/api-response";
-import { createMockTestBodySchema } from "@/lib/schemas/mock-test.schema";
+import { createMockTestBodySchema, testIdParamSchema } from "@/lib/schemas/mock-test.schema";
 import * as mockTestService from "@/services/mock-test.service";
 import { NextRequest } from "next/server";
-import { z } from "zod";
-
-const testIdParamSchema = z.object({
-    id: z.string().min(1, "Test ID is required"),
-});
 
 const updateMockTestBodySchema = createMockTestBodySchema.partial();
 

@@ -40,12 +40,19 @@ import {
   createBatch,
   updateBatch,
   fetchStudentsNotInBatch,
+  fetchStudentsInBatch,
   fetchFacultiesNotInBatch,
+  fetchFacultiesInBatch,
   addStudentsToBatch,
   addFacultiesToBatch,
   type BatchListItem,
   type CreateBatchPayload,
   type UserListItem,
+  type StudentInBatch,
+  type FacultyInBatch,
+  bulkImportStudentsAndFaculty,
+  downloadStudentFacultyTemplate,
+  type BulkImportErrorDetail,
 } from "@/lib/api/batches";
 import { Plus, Pencil, ChevronLeft, ChevronRight, Users, UserCog } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -60,6 +67,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import {
@@ -93,6 +101,7 @@ export default function BatchesPage() {
   const [studentsModalOpen, setStudentsModalOpen] = useState(false);
   const [facultiesModalOpen, setFacultiesModalOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchListItem | null>(null);
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -148,10 +157,18 @@ export default function BatchesPage() {
             View and manage batches. Set a batch to inactive instead of deleting it.
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Create batch
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setBulkImportModalOpen(true)}
+          >
+            Bulk Import (Excel)
+          </Button>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create batch
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -377,6 +394,11 @@ export default function BatchesPage() {
           invalidateList();
         }}
       />
+      <BulkImportModal
+        open={bulkImportModalOpen}
+        onClose={() => setBulkImportModalOpen(false)}
+        batches={list}
+      />
     </div>
   );
 }
@@ -565,10 +587,16 @@ function AddStudentsModal({
   batch: BatchListItem | null;
   onSuccess: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students-not-in-batch", batch?.id],
     queryFn: () => fetchStudentsNotInBatch(batch?.id || ""),
+    enabled: open && !!batch?.id,
+  });
+  const { data: existingStudents = [], isLoading: existingLoading } = useQuery({
+    queryKey: ["students-in-batch", batch?.id],
+    queryFn: () => fetchStudentsInBatch(batch?.id || ""),
     enabled: open && !!batch?.id,
   });
 
@@ -578,6 +606,10 @@ function AddStudentsModal({
     onSuccess: () => {
       toast.success("Students added to batch");
       setSelectedIds([]);
+      if (batch?.id) {
+        queryClient.invalidateQueries({ queryKey: ["students-not-in-batch", batch.id] });
+        queryClient.invalidateQueries({ queryKey: ["students-in-batch", batch.id] });
+      }
       onSuccess();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -605,46 +637,79 @@ function AddStudentsModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Students to {batch?.name}</DialogTitle>
         </DialogHeader>
-        {isLoading ? (
+        {(isLoading || existingLoading) ? (
           <div className="py-8 text-center text-muted-foreground">
             Loading students...
           </div>
-        ) : students.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">
-            No available students found.
-          </div>
         ) : (
-          <div className="space-y-4">
-            <div className="max-h-[400px] overflow-y-auto space-y-2">
-              {students.map((student) => (
-                <div
-                  key={student.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => toggleSelection(student.id)}
-                >
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedIds.includes(student.id)}
-                      onCheckedChange={() => toggleSelection(student.id)}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{student.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {student.email}
-                    </p>
-                  </div>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Available students to add</h3>
+              {students.length === 0 ? (
+                <div className="py-4 text-sm text-muted-foreground">
+                  No available students found.
                 </div>
-              ))}
+              ) : (
+                <div className="max-h-[320px] overflow-y-auto space-y-2 border rounded-md p-2">
+                  {students.map((student: UserListItem) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => toggleSelection(student.id)}
+                    >
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(student.id)}
+                          onCheckedChange={() => toggleSelection(student.id)}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{student.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {student.email}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 text-sm text-muted-foreground">
+                {selectedIds.length} student{selectedIds.length !== 1 ? "s" : ""} selected
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {selectedIds.length} student{selectedIds.length !== 1 ? "s" : ""}{" "}
-              selected
+
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Existing students in this batch</h3>
+              {existingStudents.length === 0 ? (
+                <div className="py-4 text-sm text-muted-foreground">
+                  No students currently in this batch.
+                </div>
+              ) : (
+                <div className="max-h-[240px] overflow-y-auto space-y-2 border rounded-md p-2 bg-muted/40">
+                  {existingStudents.map((student: StudentInBatch) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border bg-background"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{student.user.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {student.user.email}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 text-xs text-muted-foreground">
+                These students are already part of this batch.
+              </div>
             </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
@@ -675,6 +740,7 @@ function AddFacultiesModal({
   batch: BatchListItem | null;
   onSuccess: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { data: faculties = [], isLoading } = useQuery({
     queryKey: ["faculties-not-in-batch", batch?.id],
@@ -688,6 +754,10 @@ function AddFacultiesModal({
     onSuccess: () => {
       toast.success("Faculties added to batch");
       setSelectedIds([]);
+      if (batch?.id) {
+        queryClient.invalidateQueries({ queryKey: ["faculties-not-in-batch", batch.id] });
+        queryClient.invalidateQueries({ queryKey: ["faculties-in-batch", batch.id] });
+      }
       onSuccess();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -715,7 +785,7 @@ function AddFacultiesModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Faculties to {batch?.name}</DialogTitle>
         </DialogHeader>
@@ -723,38 +793,45 @@ function AddFacultiesModal({
           <div className="py-8 text-center text-muted-foreground">
             Loading faculties...
           </div>
-        ) : faculties.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">
-            No available faculties found.
-          </div>
         ) : (
-          <div className="space-y-4">
-            <div className="max-h-[400px] overflow-y-auto space-y-2">
-              {faculties.map((faculty) => (
-                <div
-                  key={faculty.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => toggleSelection(faculty.id)}
-                >
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedIds.includes(faculty.id)}
-                      onCheckedChange={() => toggleSelection(faculty.id)}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{faculty.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {faculty.email}
-                    </p>
-                  </div>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Available faculties to add</h3>
+              {faculties.length === 0 ? (
+                <div className="py-4 text-sm text-muted-foreground">
+                  No available faculties found.
                 </div>
-              ))}
+              ) : (
+                <div className="max-h-[320px] overflow-y-auto space-y-2 border rounded-md p-2">
+                  {faculties.map((faculty: UserListItem) => (
+                    <div
+                      key={faculty.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => toggleSelection(faculty.id)}
+                    >
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(faculty.id)}
+                          onCheckedChange={() => toggleSelection(faculty.id)}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{faculty.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {faculty.email}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 text-sm text-muted-foreground">
+                {selectedIds.length} facult{selectedIds.length !== 1 ? "ies" : "y"} selected
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {selectedIds.length} facult{selectedIds.length !== 1 ? "ies" : "y"}{" "}
-              selected
-            </div>
+
+            <FacultiesInBatchSection batchId={batch?.id} />
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
@@ -771,6 +848,262 @@ function AddFacultiesModal({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BulkImportModal({
+  open,
+  onClose,
+  batches,
+}: {
+  open: boolean;
+  onClose: () => void;
+  batches: BatchListItem[];
+}) {
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [errors, setErrors] = useState<BulkImportErrorDetail[] | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const url = await downloadStudentFacultyTemplate();
+      window.open(url, "_blank");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message || "Failed to download template");
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setFile(f);
+  };
+
+  const handleImport = async () => {
+    if (!file) {
+      toast.error("Please select an Excel file to import");
+      return;
+    }
+    setIsImporting(true);
+    setErrors(null);
+    try {
+      const result = await bulkImportStudentsAndFaculty(file, selectedBatchId || undefined);
+      toast.success(
+        `Imported ${result.studentsImported} student(s) and ${result.facultyImported} faculty member(s) successfully`
+      );
+      setFile(null);
+      setSelectedBatchId("");
+      onClose();
+    } catch (e: any) {
+      const details = e?.response?.data?.error?.details as BulkImportErrorDetail[] | undefined;
+      if (details && Array.isArray(details) && details.length > 0) {
+        setErrors(details);
+        toast.error("Import failed due to validation errors");
+      } else {
+        const err = e as Error;
+        toast.error(err.message || "Bulk import failed");
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedBatchId("");
+      setFile(null);
+      setErrors(null);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex flex-col gap-1">
+            <span>Bulk Import Students & Faculties</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              Use the standard Excel template to add multiple students and faculties at once.
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6 pt-2">
+          {/* Top: Batch selection + quick summary */}
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Target batch (optional)
+              </Label>
+              <Select
+                value={selectedBatchId || "none"}
+                onValueChange={(value) => {
+                  setSelectedBatchId(value === "none" ? "" : value);
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="No batch selected" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No batch (do not link)</SelectItem>
+                  {batches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name} ({b.examType} – {b.year})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Pick a batch to auto-link new faculties and students (when no{" "}
+                <span className="font-semibold">Batch Name</span> is set in Excel).
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3 py-3 text-[11px] text-emerald-900 space-y-1.5 shadow-[0_0_0_1px_rgba(16,185,129,0.05)]">
+              <p className="font-semibold text-emerald-900 text-xs flex items-center gap-1.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Smart validation
+              </p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>Creates users, students and faculties from both sheets.</li>
+                <li>All-or-nothing save if every row passes validation.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Middle: Template download + file upload */}
+          <div className="grid gap-4 md:grid-cols-2 items-start">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Download template
+              </Label>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadTemplate}
+                  className="gap-1.5"
+                >
+                  Download Excel template
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Includes separate <span className="font-semibold">Students</span> and{" "}
+                <span className="font-semibold">Faculty</span> sheets.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Upload filled template
+              </Label>
+              <Input
+                type="file"
+                accept=".xlsx,.xls"
+                disabled={isImporting}
+                onChange={handleFileChange}
+                className="cursor-pointer"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                All rows must pass validation; otherwise nothing is imported.
+              </p>
+              {file && (
+                <p className="text-[11px] text-foreground/80 truncate">
+                  Selected file: <span className="font-medium">{file.name}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Error panel */}
+          {errors && errors.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 max-h-44 overflow-auto space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-destructive">
+                  Validation errors ({errors.length})
+                </p>
+                <span className="text-[11px] text-destructive/80">
+                  Fix these in Excel and re-upload. No rows have been imported yet.
+                </span>
+              </div>
+              <ul className="space-y-0.5 text-xs text-destructive">
+                {errors.slice(0, 10).map((err, idx) => (
+                  <li key={idx}>
+                    Row {err.row} – <span className="font-semibold">{err.field}</span>: {err.reason}
+                  </li>
+                ))}
+                {errors.length > 10 && (
+                  <li>...and {errors.length - 10} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {/* Footer actions */}
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <LoadingButton
+              type="button"
+              loading={isImporting}
+              onClick={handleImport}
+              disabled={!file}
+            >
+              Start Import
+            </LoadingButton>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FacultiesInBatchSection({ batchId }: { batchId: string | null | undefined }) {
+  const { data: existingFaculties = [], isLoading } = useQuery({
+    queryKey: ["faculties-in-batch", batchId],
+    queryFn: () => fetchFacultiesInBatch(batchId || ""),
+    enabled: !!batchId,
+  });
+
+  if (isLoading) {
+    return (
+      <div>
+        <h3 className="text-sm font-semibold mb-2">Existing faculties in this batch</h3>
+        <div className="py-4 text-sm text-muted-foreground">Loading existing faculties...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-2">Existing faculties in this batch</h3>
+      {existingFaculties.length === 0 ? (
+        <div className="py-4 text-sm text-muted-foreground">
+          No faculties currently assigned to this batch.
+        </div>
+      ) : (
+        <div className="max-h-[240px] overflow-y-auto space-y-2 border rounded-md p-2 bg-muted/40">
+          {existingFaculties.map((faculty: FacultyInBatch) => (
+            <div
+              key={faculty.id}
+              className="flex items-center gap-3 p-3 rounded-lg border bg-background"
+            >
+              <div className="flex-1">
+                <p className="font-medium">{faculty.user.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {faculty.user.email}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 text-xs text-muted-foreground">
+        These faculties are already assigned to this batch.
+      </div>
+    </div>
   );
 }
 

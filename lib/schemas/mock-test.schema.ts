@@ -5,6 +5,35 @@ export const batchIdParamSchema = z.object({
     id: z.string().min(1, "Batch ID is required"),
 });
 
+export const testIdParamSchema = z.object({
+    id: z.string().min(1, "Test ID is required"),
+});
+
+export const testAttemptIdParamsSchema = z.object({
+    id: z.string().min(1, "Test ID is required"),
+    attemptId: z.string().min(1, "Attempt ID is required"),
+});
+
+export const createTestAttemptBodySchema = z.object({
+    studentId: z.string().min(1, "Student ID is required"),
+    physicsMarks: z.coerce.number().optional().nullable(),
+    chemistryMarks: z.coerce.number().optional().nullable(),
+    mathematicsMarks: z.coerce.number().optional().nullable(),
+    zoologyMarks: z.coerce.number().optional().nullable(),
+    botanyMarks: z.coerce.number().optional().nullable(),
+    totalScore: z.coerce.number().optional().nullable(),
+    percentile: z.coerce.number().optional().nullable(),
+    submittedAt: z.string().datetime().optional().nullable(),
+});
+
+export const importGoogleSheetBodySchema = z.object({
+    url: z.string().url("A valid Google Sheets URL is required"),
+});
+
+export const deleteTestAttemptsBodySchema = z.object({
+    attemptIds: z.array(z.string().min(1)).min(1, "At least one attempt ID is required"),
+});
+
 export const createMockTestBodySchema = z.object({
     name: z.string().min(1, "Test name is required"),
     batchId: z.string().nullable(),
@@ -81,4 +110,9 @@ export const createTestFormSchema = (examType: ExamType | undefined) => {
 
 export type CreateMockTestBody = z.infer<typeof createMockTestBodySchema>;
 export type BatchIdParam = z.infer<typeof batchIdParamSchema>;
+export type TestIdParam = z.infer<typeof testIdParamSchema>;
+export type TestAttemptIdParams = z.infer<typeof testAttemptIdParamsSchema>;
+export type CreateTestAttemptBody = z.infer<typeof createTestAttemptBodySchema>;
+export type ImportGoogleSheetBody = z.infer<typeof importGoogleSheetBodySchema>;
 export type TestFormValues = z.infer<ReturnType<typeof createTestFormSchema>>;
+export type DeleteTestAttemptsBody = z.infer<typeof deleteTestAttemptsBodySchema>;

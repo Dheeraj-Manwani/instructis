@@ -98,6 +98,7 @@ export async function getTestByIdOrThrow(testId: string): Promise<MockTestListIt
 export type TestAttemptListItem = {
     id: string;
     studentId: string;
+    mockTestId: string;
     student: {
         id: string;
         rollNo: string;
@@ -117,6 +118,7 @@ export type TestAttemptListItem = {
     totalScore: number | null;
     percentile: number | null;
     timeTaken: number | null;
+    isNotified: boolean;
 };
 
 export async function findTestAttemptsByTestId(testId: string): Promise<TestAttemptListItem[]> {
@@ -141,6 +143,7 @@ export async function findTestAttemptsByTestId(testId: string): Promise<TestAtte
     return attempts.map((attempt) => ({
         id: attempt.id,
         studentId: attempt.studentId,
+        mockTestId: attempt.mockTestId,
         student: {
             id: attempt.student.id,
             rollNo: attempt.student.rollNo,
@@ -156,6 +159,73 @@ export async function findTestAttemptsByTestId(testId: string): Promise<TestAtte
         totalScore: attempt.totalScore,
         percentile: attempt.percentile,
         timeTaken: attempt.timeTaken,
+        isNotified: attempt.isNotified,
+    }));
+}
+
+export async function findTestAttemptsByStudentInBatch(
+    studentId: string,
+    batchId: string
+): Promise<
+    Array<
+        TestAttemptListItem & {
+            mockTest: {
+                id: string;
+                name: string;
+            };
+        }
+    >
+> {
+    const attempts = await prisma.testAttempt.findMany({
+        where: {
+            studentId,
+            mockTest: {
+                batchId,
+            },
+        },
+        include: {
+            mockTest: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            student: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { startedAt: "asc" },
+    });
+
+    return attempts.map((attempt) => ({
+        id: attempt.id,
+        studentId: attempt.studentId,
+        mockTestId: attempt.mockTestId,
+        student: {
+            id: attempt.student.id,
+            rollNo: attempt.student.rollNo,
+            user: attempt.student.user,
+        },
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+        physicsMarks: attempt.physicsMarks,
+        chemistryMarks: attempt.chemistryMarks,
+        mathematicsMarks: attempt.mathematicsMarks,
+        zoologyMarks: attempt.zoologyMarks,
+        botanyMarks: attempt.botanyMarks,
+        totalScore: attempt.totalScore,
+        percentile: attempt.percentile,
+        timeTaken: attempt.timeTaken,
+        isNotified: attempt.isNotified,
+        mockTest: attempt.mockTest,
     }));
 }
 
@@ -246,6 +316,7 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
         return {
             id: attempt.id,
             studentId: attempt.studentId,
+            mockTestId: attempt.mockTestId,
             student: {
                 id: attempt.student.id,
                 rollNo: attempt.student.rollNo,
@@ -261,6 +332,7 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
             totalScore: attempt.totalScore,
             percentile: attempt.percentile,
             timeTaken: attempt.timeTaken,
+            isNotified: attempt.isNotified,
         };
     } else {
         // Create new attempt
@@ -295,6 +367,7 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
         return {
             id: attempt.id,
             studentId: attempt.studentId,
+            mockTestId: attempt.mockTestId,
             student: {
                 id: attempt.student.id,
                 rollNo: attempt.student.rollNo,
@@ -310,6 +383,88 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
             totalScore: attempt.totalScore,
             percentile: attempt.percentile,
             timeTaken: attempt.timeTaken,
+            isNotified: attempt.isNotified,
         };
     }
+}
+
+export async function getTestAttemptWithStudentAndTestOrThrow(attemptId: string) {
+    const attempt = await prisma.testAttempt.findUnique({
+        where: { id: attemptId },
+        include: {
+            student: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+            mockTest: true,
+        },
+    });
+
+    if (!attempt) {
+        throw new NotFoundError("Test attempt not found");
+    }
+
+    return attempt;
+}
+
+export async function markTestAttemptNotified(attemptId: string): Promise<TestAttemptListItem> {
+    const attempt = await prisma.testAttempt.update({
+        where: { id: attemptId },
+        data: { isNotified: true },
+        include: {
+            student: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    return {
+        id: attempt.id,
+        studentId: attempt.studentId,
+        mockTestId: attempt.mockTestId,
+        student: {
+            id: attempt.student.id,
+            rollNo: attempt.student.rollNo,
+            user: attempt.student.user,
+        },
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+        physicsMarks: attempt.physicsMarks,
+        chemistryMarks: attempt.chemistryMarks,
+        mathematicsMarks: attempt.mathematicsMarks,
+        zoologyMarks: attempt.zoologyMarks,
+        botanyMarks: attempt.botanyMarks,
+        totalScore: attempt.totalScore,
+        percentile: attempt.percentile,
+        timeTaken: attempt.timeTaken,
+        isNotified: attempt.isNotified,
+    };
+}
+
+export async function deleteTestAttemptsByIds(testId: string, attemptIds: string[]): Promise<number> {
+    const result = await prisma.testAttempt.deleteMany({
+        where: {
+            id: {
+                in: attemptIds,
+            },
+            mockTestId: testId,
+        },
+    });
+
+    return result.count;
 }

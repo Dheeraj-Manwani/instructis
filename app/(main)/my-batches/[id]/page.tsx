@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useBreadcrumb } from "@/store/BreadcrumbContext";
 import { useRouter } from "nextjs-toploader/app";
 import { useParams } from "next/navigation";
 import {
@@ -57,11 +58,22 @@ export default function BatchDetailPage() {
     const queryClient = useQueryClient();
     const [createTestModalOpen, setCreateTestModalOpen] = useState(false);
 
+    const { setBreadcrumb } = useBreadcrumb();
+
     const { data: batch, isLoading: batchLoading } = useQuery({
         queryKey: ["batch", batchId],
         queryFn: () => fetchBatchById(batchId),
         enabled: !!batchId,
     });
+
+    useEffect(() => {
+        if (batch) {
+            setBreadcrumb([
+                { label: "My Batches", href: "/my-batches" },
+                { label: batch.name },
+            ]);
+        }
+    }, [batch, setBreadcrumb]);
 
     const { data: tests = [], isLoading: testsLoading } = useQuery({
         queryKey: ["batch-tests", batchId],
