@@ -47,7 +47,7 @@ const allNavItems: NavItem[] = [
   { title: "Dashboard", path: "/dashboard", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
   { title: "Students", path: "/students", icon: Users, roles: [RoleEnum.FACULTY], isDemo: true },
   { title: "Quizzes", path: "/quizzes", icon: PenTool, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Results & Percentiles", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Results", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY], isDemo: true },
   { title: "Attendance", path: "/attendance", icon: Bell, roles: [RoleEnum.FACULTY], isDemo: true },
   { title: "Reports", path: "/reports", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
 
@@ -167,14 +167,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Filter navigation items based on user role
   const navItems = allNavItems.filter((item) =>
-    item.roles.includes(userRole) && !item.isDemo
+    item.roles.includes(userRole)
   );
+
+  const nonDemoNavItems = allNavItems.filter(item => item.roles.includes(userRole) && !item.isDemo);
 
   // Route protection: redirect unauthorized users
   const currentPageItem = allNavItems.find((item) => pathname === item.path);
   if (currentPageItem && !currentPageItem.roles.includes(userRole)) {
     // Redirect to first available route for user's role
-    const firstAvailableRoute = navItems[0]?.path || "/";
+    const firstAvailableRoute = nonDemoNavItems[0]?.path || "/";
     redirect(firstAvailableRoute);
   }
 
@@ -247,11 +249,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                       transition={{ duration: 0.15 }}
                     >
                       {item.title}
-                      {item.isDemo && (
+                      {/* {item.isDemo && (
                         <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                           (Demo)
                         </span>
-                      )}
+                      )} */}
                     </motion.span>
                   )}
                 </AnimatePresence>

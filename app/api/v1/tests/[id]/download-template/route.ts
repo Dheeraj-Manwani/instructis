@@ -16,8 +16,8 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
 
     const { id: testId } = testIdParamSchema.parse(await params);
 
-    // const includeStudentsParam = req.nextUrl.searchParams.get("includeStudents");
-    // const includeStudents = includeStudentsParam !== "false";
+  const includeStudentsParam = req.nextUrl.searchParams.get("includeStudents");
+  const includeStudents = includeStudentsParam !== "false";
 
     // Fetch test data to get batch info and marks
     // Note: getTestById returns MockTestListItem but actually includes subject marks
@@ -108,22 +108,22 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
         const totalMarks = test.totalMarks || 0;
         const cellH4 = worksheet.getCell("H4");
         cellH4.value = `Total / ${totalMarks} marks`;
-    }
+  }
 
-    // if (includeStudents) {
+  if (includeStudents) {
     // Pre-fill student roll numbers and names for this batch
     const students = await batchService.getStudentsInBatch(test.batchId);
     const maxStudents = 100;
     const startRow = 6; // row 6 is the first student row
 
     students.slice(0, maxStudents).forEach((student, index) => {
-        const rowNumber = startRow + index;
-        const row = worksheet.getRow(rowNumber);
-        // Column B: Roll No, Column C: Student Name
-        row.getCell(2).value = student.rollNo;
-        row.getCell(3).value = student.user.name;
+      const rowNumber = startRow + index;
+      const row = worksheet.getRow(rowNumber);
+      // Column B: Roll No, Column C: Student Name
+      row.getCell(2).value = student.rollNo;
+      row.getCell(3).value = student.user.name;
     });
-    // }
+  }
 
     // Generate Excel buffer
     const buffer = await workbook.xlsx.writeBuffer();
