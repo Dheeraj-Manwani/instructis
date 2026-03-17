@@ -148,6 +148,25 @@ export default function BatchDetailPage() {
     const isJEE = batch?.examType === ExamType.JEE;
     const isNEET = batch?.examType === ExamType.NEET;
 
+    // Auto-calculate total marks from subject-wise marks
+    const physicsMarks = form.watch("totalMarksPhysics");
+    const chemistryMarks = form.watch("totalMarksChemistry");
+    const mathematicsMarks = form.watch("totalMarksMathematics");
+    const zoologyMarks = form.watch("totalMarksZoology");
+    const botanyMarks = form.watch("totalMarksBotany");
+
+    useEffect(() => {
+        const physics = physicsMarks ?? 0;
+        const chemistry = chemistryMarks ?? 0;
+        const maths = isJEE ? mathematicsMarks ?? 0 : 0;
+        const zoology = isNEET ? zoologyMarks ?? 0 : 0;
+        const botany = isNEET ? botanyMarks ?? 0 : 0;
+
+        const total = physics + chemistry + maths + zoology + botany;
+
+        form.setValue("totalMarks", total, { shouldValidate: true, shouldDirty: true });
+    }, [physicsMarks, chemistryMarks, mathematicsMarks, zoologyMarks, botanyMarks, isJEE, isNEET, form]);
+
     // Reset form when dialog opens
     useEffect(() => {
         if (createTestModalOpen) {
@@ -387,10 +406,12 @@ export default function BatchDetailPage() {
                                             <FormControl>
                                                 <Input
                                                     type="number"
-                                                    min={1}
+                                                    readOnly
+                                                    min={0}
                                                     {...field}
-                                                    value={field.value ?? ""}
-                                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                                    value={field.value ?? 0}
+                                                    tabIndex={-1}
+                                                    className="pointer-events-none bg-muted text-muted-foreground border-border/60 focus-visible:ring-0 focus-visible:ring-offset-0"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -505,7 +526,7 @@ export default function BatchDetailPage() {
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    * Total marks must equal the sum of all subject marks
+                                    * Total marks are auto-calculated from the subject-wise marks above
                                 </p>
                             </div>
 
