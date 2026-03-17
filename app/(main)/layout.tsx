@@ -10,7 +10,7 @@ export default async function MainLayout({
   const session = await getServerSession();
   const user = session?.user;
 
-  if (!user) redirect("/unauthorized");
+  if (!user) redirect("/auth/sign-in");
   if (!user.emailVerified) redirect("/verify-email");
 
   return <DashboardLayout>{children}</DashboardLayout>;

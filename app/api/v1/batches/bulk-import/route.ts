@@ -109,16 +109,16 @@ async function parseStudentsSheet(
   }
 
   const expectedHeaders = [
-    "#",
-    "Full Name",
-    "Email",
-    "Roll No",
-    "Target Exam",
-    "Parent Name",
-    "Parent Phone",
-    "Parent Email",
-    "Address",
-    "Date of Birth",
+    '#',
+    'Full Name',
+    'Email',
+    'Roll No',
+    'Target Exam (JEE/NEET)',
+    'Parent Name (optional)',
+    'Parent Phone (optional)',
+    'Parent Email (optional)',
+    'Address (optional)',
+    'Date of Birth (DD/MM/YYYY) (optional)',
   ];
 
   const trimmedHeaders = headers.slice(0, expectedHeaders.length);
@@ -279,7 +279,12 @@ async function parseFacultySheet(
     headers.push(normalizeHeader(headerRow.getCell(col).value));
   }
 
-  const expectedHeaders = ["#", "Full Name", "Email", "Title", "Department"];
+  const expectedHeaders = [
+    '#',
+    'Full Name',
+    'Email',
+    'Title (optional) Dr./Prof.',
+    'Department (optional)'];
 
   const trimmedHeaders = headers.slice(0, expectedHeaders.length);
   const headersMatch =
