@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
+import { Providers } from "@/components/providers";
 import fullLogo from "@/assets/full_logo.png";
 import appLogo from "@/assets/logo.png";
 
