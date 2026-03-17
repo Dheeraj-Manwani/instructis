@@ -666,24 +666,24 @@ export default function TestDetailPage() {
             {/* Add Student & Bulk Actions Section */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                <Select value={newStudentId} onValueChange={setNewStudentId}>
-                    <SelectTrigger className="w-[300px]">
-                        <SelectValue placeholder="Select a student to add" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {studentsLoading ? (
-                            <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : availableStudents.length === 0 ? (
-                            <SelectItem value="none" disabled>No students available</SelectItem>
-                        ) : (
-                            availableStudents.map((student: StudentInBatch) => (
-                                <SelectItem key={student.id} value={student.id}>
-                                    {student.user.name} ({student.rollNo})
-                                </SelectItem>
-                            ))
-                        )}
-                    </SelectContent>
-                </Select>
+                    <Select value={newStudentId} onValueChange={setNewStudentId}>
+                        <SelectTrigger className="w-[300px]">
+                            <SelectValue placeholder="Select a student to add" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {studentsLoading ? (
+                                <SelectItem value="loading" disabled>Loading...</SelectItem>
+                            ) : availableStudents.length === 0 ? (
+                                <SelectItem value="none" disabled>No students available</SelectItem>
+                            ) : (
+                                availableStudents.map((student: StudentInBatch) => (
+                                    <SelectItem key={student.id} value={student.id}>
+                                        {student.user.name} ({student.rollNo})
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
                     <Button onClick={handleAddStudent} className="gap-2">
                         <Plus className="h-4 w-4" />
                         Add Student
@@ -1052,10 +1052,10 @@ export default function TestDetailPage() {
                     <Stat icon={Award} label="Highest Percentile:" value={highestPercentile > 0 ? `${highestPercentile.toFixed(1)}%` : "-"} />
                     <Stat icon={BellRing} label="Submitted:" value={`${submittedAttempts.length} / ${totalStudents}`} />
                 </div>
-                <button className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                {/* <button className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
                     <Save size={16} />
                     Save Marks & Generate Report
-                </button>
+                </button> */}
             </div>
 
             <p className="text-xs text-center text-muted-foreground">
