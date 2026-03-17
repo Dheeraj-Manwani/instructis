@@ -22,8 +22,8 @@ function normalizeHeader(val: ExcelJS.CellValue | undefined): string {
   if (typeof val === "string") return val.trim().replace(/\n/g, " ");
   if (val == null) return "";
   if (typeof val === "number") return String(val);
-  if (typeof val === "object" && "text" in (val as any)) {
-    return String((val as any).text).trim().replace(/\n/g, " ");
+  if (typeof val === "object" && val !== null && "text" in val) {
+    return String((val as { text: unknown }).text).trim().replace(/\n/g, " ");
   }
   return "";
 }
@@ -56,8 +56,8 @@ function parseDob(value: ExcelJS.CellValue | undefined, rowIndex: number, errors
   const text =
     typeof value === "string"
       ? value.trim()
-      : typeof value === "object" && "text" in (value as any)
-        ? String((value as any).text).trim()
+      : typeof value === "object" && value !== null && "text" in value
+        ? String((value as { text: unknown }).text).trim()
         : "";
 
   if (!text) return null;

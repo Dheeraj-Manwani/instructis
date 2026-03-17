@@ -86,6 +86,7 @@ export default function AIRankPredictor() {
         onSuccess: (data) => {
             setAiResult(data);
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             toast.error(error?.message || "Failed to analyze with AI");
         },
@@ -104,6 +105,7 @@ export default function AIRankPredictor() {
         onSuccess: (res) => {
             toast.success(res?.message || "Shared with parent on WhatsApp");
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             toast.error(error?.message || "Failed to share with parent");
         },

@@ -10,6 +10,8 @@ export function CardSkeleton({
     showHeader = true,
     lines = 3,
 }: CardSkeletonProps) {
+    const widths = Array.from({ length: lines }, (_, i) => 70 + ((i * 10) % 30))
+
     return (
         <Card>
             {showHeader && (
@@ -24,7 +26,7 @@ export function CardSkeleton({
                         key={i}
                         className="h-4"
                         style={{
-                            width: `${Math.random() * 30 + 70}%`,
+                            width: `${widths[i]}%`,
                         }}
                     />
                 ))}

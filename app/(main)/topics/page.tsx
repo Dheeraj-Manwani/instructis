@@ -112,7 +112,7 @@ export default function TopicsPage() {
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
-                  className="flex flex-wrap items-end gap-4"
+                  className="grid grid-cols-[180px,minmax(200px,1fr),auto] items-end gap-4"
                 >
                   <FormField
                     control={form.control}

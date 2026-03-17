@@ -19,7 +19,7 @@ export async function withValidation<T>(
   const result = schema.safeParse(body);
   if (!result.success) {
     const message =
-      result.error.errors[0]?.message ?? "Validation failed";
+      result.error.issues[0]?.message ?? "Validation failed";
     throw new ValidationError(message, result.error.flatten());
   }
   return result.data;

@@ -51,7 +51,7 @@ export async function notifyTestAttemptResult(attemptId: string) {
         throw new AppError("Parent phone number is not available for this student", 400);
     }
 
-    const studentName = (attempt as any).student.user?.name ?? "your ward";
+    const studentName = attempt.student.user?.name ?? "your ward";
     const testName = attempt.mockTest.name;
     const totalMarks = attempt.mockTest.totalMarks;
     const score = attempt.totalScore ?? 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import React, { ReactNode } from "react";
 import Link from "next/link";
 import { redirect, usePathname } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   Users,
   BookOpen,
   LogOutIcon,
+  LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -33,29 +34,32 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "react-hot-toast";
 import appLogo from "@/assets/logo.png";
 
-const allNavItems: Array<{
+type NavItem = {
   title: string;
   path: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   roles: RoleEnum[];
-}> = [
-    // demo / navigation options for faculty
-    { title: "Dashboard", path: "/dashboard", icon: BarChart3, roles: [RoleEnum.FACULTY] },
-    { title: "Students", path: "/students", icon: Users, roles: [RoleEnum.FACULTY] },
-    { title: "Quizzes", path: "/quizzes", icon: PenTool, roles: [RoleEnum.FACULTY] },
-    { title: "Results & Percentiles", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY] },
-    { title: "Attendance", path: "/attendance", icon: Bell, roles: [RoleEnum.FACULTY] },
-    { title: "Reports", path: "/reports", icon: BarChart3, roles: [RoleEnum.FACULTY] },
+  isDemo?: boolean;
+};
 
-    // existing faculty items
-    { title: "My Batches", path: "/my-batches", icon: Users, roles: [RoleEnum.FACULTY] },
-    { title: "Topics", path: "/topics", icon: BookOpen, roles: [RoleEnum.FACULTY] },
-    { title: "Questions", path: "/questions", icon: PenTool, roles: [RoleEnum.FACULTY] },
+const allNavItems: NavItem[] = [
+  // demo / navigation options for faculty (non-navigating)
+  { title: "Dashboard", path: "/dashboard", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Students", path: "/students", icon: Users, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Quizzes", path: "/quizzes", icon: PenTool, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Results & Percentiles", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Attendance", path: "/attendance", icon: Bell, roles: [RoleEnum.FACULTY], isDemo: true },
+  { title: "Reports", path: "/reports", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
 
-    // existing admin items
-    { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
-    { title: "User Management", path: "/admin/users", icon: ShieldCheck, roles: [RoleEnum.ADMIN] },
-  ];
+  // existing faculty items
+  { title: "My Batches", path: "/my-batches", icon: Users, roles: [RoleEnum.FACULTY] },
+  { title: "Topics", path: "/topics", icon: BookOpen, roles: [RoleEnum.FACULTY] },
+  { title: "Questions", path: "/questions", icon: PenTool, roles: [RoleEnum.FACULTY] },
+
+  // existing admin items
+  { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
+  { title: "User Management", path: "/admin/users", icon: ShieldCheck, roles: [RoleEnum.ADMIN] },
+];
 
 const pageTitles: Record<string, string> = {
   // common
@@ -163,7 +167,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Filter navigation items based on user role
   const navItems = allNavItems.filter((item) =>
-    item.roles.includes(userRole)
+    item.roles.includes(userRole) && !item.isDemo
   );
 
   // Route protection: redirect unauthorized users
@@ -218,7 +222,42 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Nav - Next.js Link triggers NextTopLoader on navigation */}
         <nav className="flex-1 space-y-1 p-2 pt-3">
           {navItems.map((item, index) => {
-            const active = pathname.startsWith(item.path);
+            const active = !item.isDemo && pathname.startsWith(item.path);
+            const commonClasses = cn(
+              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150 relative group",
+              active
+                ? "border-l-[3px] border-primary bg-primary/8 text-primary"
+                : "border-l-[3px] border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+            );
+
+            const content = (
+              <>
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <item.icon size={18} className="shrink-0" />
+                </motion.div>
+                <AnimatePresence mode="wait">
+                  {!collapsed && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {item.title}
+                      {item.isDemo && (
+                        <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          (Demo)
+                        </span>
+                      )}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </>
+            );
+
             return (
               <motion.div
                 key={item.path}
@@ -226,34 +265,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Link
-                  href={item.path}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150 relative group",
-                    active
-                      ? "border-l-[3px] border-primary bg-primary/8 text-primary"
-                      : "border-l-[3px] border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
+                {item.isDemo ? (
+                  <button
+                    type="button"
+                    className={commonClasses}
+                    onClick={() => toast("This is a demo menu item")}
                   >
-                    <item.icon size={18} className="shrink-0" />
-                  </motion.div>
-                  <AnimatePresence mode="wait">
-                    {!collapsed && (
-                      <motion.span
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        {item.title}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </Link>
+                    {content}
+                  </button>
+                ) : (
+                  <Link href={item.path} className={commonClasses}>
+                    {content}
+                  </Link>
+                )}
               </motion.div>
             );
           })}
@@ -261,12 +285,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Sidebar footer */}
         <div className="border-t border-border p-3 space-y-2">
-          {!collapsed && (
+          {/* {!collapsed && (
             <div className="flex items-center gap-2">
               <ModeToggle />
               <UserDropdown user={user} />
             </div>
-          )}
+          )} */}
           <button
             onClick={handleSignOut}
             className="flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
@@ -296,12 +320,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             )}
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+            {/* <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
               <Bell size={18} />
               <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
                 3
               </span>
-            </button>
+            </button> */}
             <div className="flex items-center gap-2 mr-3">
               <ModeToggle />
               <UserDropdown user={user} />

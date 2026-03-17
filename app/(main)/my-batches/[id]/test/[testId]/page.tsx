@@ -459,7 +459,7 @@ export default function TestDetailPage() {
     // Add new attempts
     editingAttempts.forEach((attempt, studentId) => {
         if (attempt.isNew && !allAttempts.find((a) => a.studentId === studentId)) {
-            allAttempts.push(attempt as any);
+            allAttempts.push(attempt as unknown as TestAttemptListItem);
         }
     });
 

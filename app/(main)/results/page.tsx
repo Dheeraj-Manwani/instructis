@@ -86,7 +86,7 @@ export default function Results() {
                         </div>
 
                         <p className="text-sm text-foreground mb-3">
-                            <strong>Great Progress!</strong> You've improved by {student.improvement} points from the last test.
+                            <strong>Great Progress!</strong> You&apos;ve improved by {student.improvement} points from the last test.
                         </p>
 
                         <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -129,7 +129,7 @@ export default function Results() {
                         </div>
 
                         <p className="text-sm text-foreground mb-3">
-                            <strong>Well Done!</strong> You've improved by 19 points from the last test.
+                            <strong>Well Done!</strong> You&apos;ve improved by 19 points from the last test.
                         </p>
 
                         <div className="flex items-start gap-2 text-sm text-muted-foreground">

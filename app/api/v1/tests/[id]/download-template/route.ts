@@ -21,7 +21,8 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
 
     // Fetch test data to get batch info and marks
     // Note: getTestById returns MockTestListItem but actually includes subject marks
-    const test = await mockTestService.getTestById(testId) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const test = (await mockTestService.getTestById(testId)) as any;
 
     if (!test.batchId) {
         return ApiResponse.error("Test is not associated with a batch", 400);

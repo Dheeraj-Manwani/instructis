@@ -104,6 +104,7 @@ export default function BatchesPage() {
   const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [examType, isActiveFilter]);
 
@@ -631,6 +632,7 @@ function AddStudentsModal({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedIds([]);
     }
   }, [open]);
@@ -779,6 +781,7 @@ function AddFacultiesModal({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedIds([]);
     }
   }, [open]);
@@ -895,8 +898,10 @@ function BulkImportModal({
       setFile(null);
       setSelectedBatchId("");
       onClose();
-    } catch (e: any) {
-      const details = e?.response?.data?.error?.details as BulkImportErrorDetail[] | undefined;
+    } catch (e: unknown) {
+      const details = (e as { response?: { data?: { error?: { details?: BulkImportErrorDetail[] } } } })?.response?.data?.error?.details as
+        | BulkImportErrorDetail[]
+        | undefined;
       if (details && Array.isArray(details) && details.length > 0) {
         setErrors(details);
         toast.error("Import failed due to validation errors");

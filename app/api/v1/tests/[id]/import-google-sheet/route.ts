@@ -17,8 +17,8 @@ function normalizeHeader(val: ExcelJS.CellValue | undefined): string {
     if (typeof val === "string") return val.trim();
     if (val == null) return "";
     if (typeof val === "number") return String(val);
-    if (typeof val === "object" && "text" in (val as any)) {
-        return String((val as any).text).trim();
+    if (typeof val === "object" && val !== null && "text" in val) {
+        return String((val as { text: unknown }).text).trim();
     }
     return "";
 }
@@ -173,6 +173,7 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
     const arrayBuffer = await response.arrayBuffer();
 
     // Get test and batch
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const test = (await mockTestService.getTestById(testId)) as any;
     if (!test.batchId) {
         throw new ValidationError("Test is not associated with a batch");

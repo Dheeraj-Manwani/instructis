@@ -110,6 +110,7 @@ export default function QuestionsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [search, subject, difficulty, isPublishedFilter]);
 

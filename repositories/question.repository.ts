@@ -1,4 +1,4 @@
-import type { Difficulty, QuestionType, SubjectEnum } from "@prisma/client";
+import type { Difficulty, Prisma, QuestionType, SubjectEnum } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/utils/errors";
 
@@ -50,7 +50,7 @@ export async function findManyQuestions(
   } = params;
   const skip = (page - 1) * limit;
 
-  const where: Parameters<typeof prisma.question.findMany>[0]["where"] = {};
+  const where: Prisma.QuestionWhereInput = {};
   if (search?.trim()) {
     where.text = { contains: search.trim(), mode: "insensitive" };
   }
@@ -157,7 +157,7 @@ export async function createQuestion(data: CreateData): Promise<QuestionWithOpti
               orderIndex: o.orderIndex,
             })),
           }
-        : undefined,
+          : undefined,
     },
     include: {
       topic: { select: { name: true } },
@@ -210,14 +210,14 @@ export async function updateQuestion(
       ...rest,
       ...(options?.length
         ? {
-            options: {
-              create: options.map((o) => ({
-                text: o.text,
-                isCorrect: o.isCorrect,
-                orderIndex: o.orderIndex,
-              })),
-            },
-          }
+          options: {
+            create: options.map((o) => ({
+              text: o.text,
+              isCorrect: o.isCorrect,
+              orderIndex: o.orderIndex,
+            })),
+          },
+        }
         : {}),
     },
     include: {

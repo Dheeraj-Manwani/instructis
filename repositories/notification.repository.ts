@@ -5,7 +5,7 @@ export async function createWhatsAppLog(params: {
     parentPhone: string;
     message: string;
     status: string;
-    metadata?: unknown;
+    metadata?: any;
 }) {
     const { studentId, parentPhone, message, status, metadata } = params;
 
@@ -15,7 +15,7 @@ export async function createWhatsAppLog(params: {
             parentPhone,
             message,
             status,
-            metadata: metadata as any,
+            metadata,
         },
     });
 }

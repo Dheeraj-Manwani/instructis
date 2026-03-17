@@ -6,11 +6,12 @@ import { motion, useInView, animate } from "motion/react";
 import {
   ArrowRight, Play, CheckCircle2, Upload, Brain, Search, MessageSquare,
   FileText, BarChart3, Star, Twitter, Linkedin, MessageCircle, ChevronRight,
-  School, GraduationCap, Smartphone, Trophy, Sparkles, Zap, Menu, X
+  School, GraduationCap, Smartphone, Trophy, Sparkles, Menu, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-// import { TextLoop } from "@/components/TextLoop";
+import Image from "next/image";
+import appLogo from "@/assets/logo.png";
 
 /* ─── helpers ─── */
 function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -79,8 +80,12 @@ export default function LandingPage() {
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-emerald-500/25 overflow-hidden">
+              <Image
+                src={appLogo}
+                alt="Instructis"
+                className="h-8 w-8 object-contain"
+              />
             </div>
             <span className="text-xl font-extrabold tracking-tight">Instructis</span>
           </Link>
@@ -478,7 +483,7 @@ export default function LandingPage() {
                     <Star key={j} className="w-4 h-4 text-amber-400" fill="currentColor" />
                   ))}
                 </div>
-                <p className="text-slate-600 text-sm leading-relaxed mb-6">"{t.quote}"</p>
+                <p className="text-slate-600 text-sm leading-relaxed mb-6">&quot;{t.quote}&quot;</p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
                     {t.name.split(" ").map(w => w[0]).join("")}
@@ -525,8 +530,12 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-10 mb-12">
             <div className="md:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center overflow-hidden">
+                  <Image
+                    src={appLogo}
+                    alt="Instructis"
+                    className="h-7 w-7 object-contain"
+                  />
                 </div>
                 <span className="text-lg font-extrabold text-white">Instructis</span>
               </div>

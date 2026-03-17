@@ -23,8 +23,8 @@ function normalizeHeader(val: ExcelJS.CellValue | undefined): string {
   if (typeof val === "string") return val.trim().replace(/\n/g, " ");
   if (val == null) return "";
   if (typeof val === "number") return String(val);
-  if (typeof val === "object" && "text" in (val as any)) {
-    return String((val as any).text).trim().replace(/\n/g, " ");
+  if (typeof val === "object" && val !== null && "text" in val) {
+    return String((val as { text: unknown }).text).trim().replace(/\n/g, " ");
   }
   return "";
 }
@@ -42,11 +42,9 @@ function getWorksheetByName(workbook: ExcelJS.Workbook, name: string): ExcelJS.W
 function parseDob(value: ExcelJS.CellValue | undefined, rowIndex: number, errors: RowError[]): Date | null {
   if (value == null || value === "") return null;
 
-  // Excel date serial
+  // Excel date serial (number of days since 1899-12-30)
   if (typeof value === "number") {
-    const date = ExcelJS.DateUtils.excelToJsDate
-      ? (ExcelJS.DateUtils as any).excelToJsDate(value)
-      : new Date(Math.round((value - 25569) * 86400 * 1000)); // fallback
+    const date = new Date(Math.round((value - 25569) * 86400 * 1000));
     if (Number.isNaN(date.getTime())) {
       errors.push({ row: rowIndex, field: "dob", reason: "Invalid date format" });
       return null;
@@ -57,9 +55,9 @@ function parseDob(value: ExcelJS.CellValue | undefined, rowIndex: number, errors
   const text =
     typeof value === "string"
       ? value.trim()
-      : typeof value === "object" && "text" in (value as any)
-      ? String((value as any).text).trim()
-      : "";
+      : typeof value === "object" && value !== null && "text" in value
+        ? String((value as { text: unknown }).text).trim()
+        : "";
 
   if (!text) return null;
 
@@ -411,6 +409,7 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
     for (const row of studentRows) {
       const user = await tx.user.create({
         data: {
+          id: crypto.randomUUID(),
           name: row.name,
           email: row.email,
           emailVerified: false,
@@ -444,6 +443,7 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
     for (const row of facultyRows) {
       const user = await tx.user.create({
         data: {
+          id: crypto.randomUUID(),
           name: row.name,
           email: row.email,
           emailVerified: false,

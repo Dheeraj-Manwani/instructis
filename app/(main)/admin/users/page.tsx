@@ -237,7 +237,7 @@ export default function UserManagement() {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Confirm role change</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            Change <strong>{user.name}</strong>'s role from{" "}
+                                                            Change <strong>{user.name}</strong>&apos;s role from{" "}
                                                             <Badge className={getRoleBadge(user.role).className}>
                                                                 {getRoleBadge(user.role).label}
                                                             </Badge>{" "}

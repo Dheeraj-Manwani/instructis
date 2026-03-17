@@ -129,7 +129,7 @@ export default function WhatsAppPreview() {
                         {/* Letter message */}
                         <div className="max-w-[320px] rounded-lg rounded-tl-none bg-card p-4 shadow-sm space-y-3">
                             <p className="text-xs text-foreground">Dear Parent,</p>
-                            <p className="text-xs text-foreground">Here is {selectedStudent.name.split(" ")[0]}'s latest report card from his recent exams. He is showing significant <strong>improvement</strong>!</p>
+                            <p className="text-xs text-foreground">Here is {selectedStudent.name.split(" ")[0]}&apos;s latest report card from his recent exams. He is showing significant <strong>improvement</strong>!</p>
 
                             {/* Student card */}
                             <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
