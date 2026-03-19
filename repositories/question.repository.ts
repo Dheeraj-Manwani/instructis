@@ -58,7 +58,6 @@ export async function findManyQuestions(
   if (type) where.type = type;
   if (difficulty) where.difficulty = difficulty;
   if (typeof isPublished === "boolean") where.isPublished = isPublished;
-  if (facultyId) where.facultyId = facultyId;
 
   const orderBy = { [sortBy]: sortOrder } as const;
 

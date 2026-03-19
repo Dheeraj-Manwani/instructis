@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
-import { NotFoundError } from "@/lib/utils/errors";
+import { NotFoundError, ValidationError } from "@/lib/utils/errors";
+import { ExamType } from "@prisma/client";
 
 export type MockTestListItem = {
     id: string;
@@ -93,6 +94,225 @@ export async function getTestByIdOrThrow(testId: string): Promise<MockTestListIt
     }
 
     return test;
+}
+
+export type TestQuestionListItem = {
+    id: string;
+    mockTestId: string;
+    questionId: string;
+    orderIndex: number;
+    marks: number;
+    negMarks: number;
+    question: {
+        id: string;
+        text: string;
+        difficulty: string;
+        subject: string;
+        topicName: string | null;
+    };
+};
+
+function mapTestQuestion(item: {
+    id: string;
+    mockTestId: string;
+    questionId: string;
+    orderIndex: number;
+    marks: number;
+    negMarks: number;
+    question: {
+        id: string;
+        text: string;
+        difficulty: string;
+        subject: string;
+        topic: { name: string } | null;
+    };
+}): TestQuestionListItem {
+    return {
+        id: item.id,
+        mockTestId: item.mockTestId,
+        questionId: item.questionId,
+        orderIndex: item.orderIndex,
+        marks: item.marks,
+        negMarks: item.negMarks,
+        question: {
+            id: item.question.id,
+            text: item.question.text,
+            difficulty: item.question.difficulty,
+            subject: item.question.subject,
+            topicName: item.question.topic?.name ?? null,
+        },
+    };
+}
+
+export async function findTestQuestionsByTestId(testId: string): Promise<TestQuestionListItem[]> {
+    const rows = await prisma.mockTestQuestion.findMany({
+        where: { mockTestId: testId },
+        include: {
+            question: {
+                select: {
+                    id: true,
+                    text: true,
+                    difficulty: true,
+                    subject: true,
+                    topic: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { orderIndex: "asc" },
+    });
+
+    return rows.map(mapTestQuestion);
+}
+
+export async function addQuestionToTest(
+    testId: string,
+    questionId: string,
+    marks = 4,
+    negMarks = 1
+): Promise<TestQuestionListItem> {
+    const existing = await prisma.mockTestQuestion.findFirst({
+        where: { mockTestId: testId, questionId },
+        include: {
+            question: {
+                select: {
+                    id: true,
+                    text: true,
+                    difficulty: true,
+                    subject: true,
+                    topic: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (existing) return mapTestQuestion(existing);
+
+    // Validate that question's subject is allowed for the test's exam type.
+    const mockTest = await prisma.mockTest.findUnique({
+        where: { id: testId },
+        select: {
+            batchId: true,
+            batch: {
+                select: { examType: true },
+            },
+        },
+    });
+
+    if (!mockTest || !mockTest.batch) {
+        throw new ValidationError("Test is not associated with a batch/exam type");
+    }
+
+    const examType = mockTest.batch.examType as ExamType;
+    const allowedSubjects =
+        examType === ExamType.JEE
+            ? ["PHYSICS", "CHEMISTRY", "MATHEMATICS"]
+            : ["PHYSICS", "CHEMISTRY", "ZOOLOGY", "BOTANY"];
+
+    const question = await prisma.question.findUnique({
+        where: { id: questionId },
+        select: { subject: true },
+    });
+
+    if (!question) {
+        throw new NotFoundError("Question not found");
+    }
+
+    if (!allowedSubjects.includes(question.subject)) {
+        throw new ValidationError(
+            `Question subject '${question.subject}' cannot be added to a ${examType} test`
+        );
+    }
+
+    const maxOrder = await prisma.mockTestQuestion.aggregate({
+        where: { mockTestId: testId },
+        _max: { orderIndex: true },
+    });
+    const nextOrder = (maxOrder._max.orderIndex ?? 0) + 1;
+
+    const created = await prisma.mockTestQuestion.create({
+        data: {
+            mockTestId: testId,
+            questionId,
+            marks,
+            negMarks,
+            orderIndex: nextOrder,
+        },
+        include: {
+            question: {
+                select: {
+                    id: true,
+                    text: true,
+                    difficulty: true,
+                    subject: true,
+                    topic: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    return mapTestQuestion(created);
+}
+
+export async function updateTestQuestion(
+    testId: string,
+    testQuestionId: string,
+    data: Partial<{ marks: number; negMarks: number; orderIndex: number }>
+): Promise<TestQuestionListItem> {
+    const existing = await prisma.mockTestQuestion.findFirst({
+        where: { id: testQuestionId, mockTestId: testId },
+        select: { id: true },
+    });
+    if (!existing) {
+        throw new NotFoundError("Test question not found");
+    }
+
+    const updated = await prisma.mockTestQuestion.update({
+        where: { id: testQuestionId },
+        data,
+        include: {
+            question: {
+                select: {
+                    id: true,
+                    text: true,
+                    difficulty: true,
+                    subject: true,
+                    topic: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    return mapTestQuestion(updated);
+}
+
+export async function removeQuestionFromTest(testId: string, testQuestionId: string): Promise<void> {
+    const existing = await prisma.mockTestQuestion.findFirst({
+        where: { id: testQuestionId, mockTestId: testId },
+        select: { id: true },
+    });
+    if (!existing) {
+        throw new NotFoundError("Test question not found");
+    }
+
+    await prisma.mockTestQuestion.delete({
+        where: { id: testQuestionId },
+    });
 }
 
 export type TestAttemptListItem = {

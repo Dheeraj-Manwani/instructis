@@ -20,6 +20,35 @@ export async function getTestById(testId: string) {
     return mockTestRepository.getTestByIdOrThrow(testId);
 }
 
+export async function getTestQuestions(testId: string) {
+    await mockTestRepository.getTestByIdOrThrow(testId);
+    return mockTestRepository.findTestQuestionsByTestId(testId);
+}
+
+export async function addQuestionToTest(
+    testId: string,
+    questionId: string,
+    marks?: number,
+    negMarks?: number
+) {
+    await mockTestRepository.getTestByIdOrThrow(testId);
+    return mockTestRepository.addQuestionToTest(testId, questionId, marks ?? 4, negMarks ?? 1);
+}
+
+export async function updateTestQuestion(
+    testId: string,
+    testQuestionId: string,
+    data: Partial<{ marks: number; negMarks: number; orderIndex: number }>
+) {
+    await mockTestRepository.getTestByIdOrThrow(testId);
+    return mockTestRepository.updateTestQuestion(testId, testQuestionId, data);
+}
+
+export async function removeQuestionFromTest(testId: string, testQuestionId: string) {
+    await mockTestRepository.getTestByIdOrThrow(testId);
+    return mockTestRepository.removeQuestionFromTest(testId, testQuestionId);
+}
+
 export async function getTestAttempts(testId: string) {
     await mockTestRepository.getTestByIdOrThrow(testId);
     return mockTestRepository.findTestAttemptsByTestId(testId);

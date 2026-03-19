@@ -14,6 +14,11 @@ export const testAttemptIdParamsSchema = z.object({
     attemptId: z.string().min(1, "Attempt ID is required"),
 });
 
+export const testQuestionIdParamsSchema = z.object({
+    id: z.string().min(1, "Test ID is required"),
+    testQuestionId: z.string().min(1, "Test question ID is required"),
+});
+
 export const createTestAttemptBodySchema = z.object({
     studentId: z.string().min(1, "Student ID is required"),
     physicsMarks: z.coerce.number().optional().nullable(),
@@ -32,6 +37,20 @@ export const importGoogleSheetBodySchema = z.object({
 
 export const deleteTestAttemptsBodySchema = z.object({
     attemptIds: z.array(z.string().min(1)).min(1, "At least one attempt ID is required"),
+});
+
+export const addTestQuestionBodySchema = z.object({
+    questionId: z.string().min(1, "Question ID is required"),
+    marks: z.coerce.number().int().min(0).optional(),
+    negMarks: z.coerce.number().min(0).optional(),
+});
+
+export const updateTestQuestionBodySchema = z.object({
+    marks: z.coerce.number().int().min(0).optional(),
+    negMarks: z.coerce.number().min(0).optional(),
+    orderIndex: z.coerce.number().int().min(1).optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required",
 });
 
 export const createMockTestBodySchema = z.object({
@@ -112,7 +131,10 @@ export type CreateMockTestBody = z.infer<typeof createMockTestBodySchema>;
 export type BatchIdParam = z.infer<typeof batchIdParamSchema>;
 export type TestIdParam = z.infer<typeof testIdParamSchema>;
 export type TestAttemptIdParams = z.infer<typeof testAttemptIdParamsSchema>;
+export type TestQuestionIdParams = z.infer<typeof testQuestionIdParamsSchema>;
 export type CreateTestAttemptBody = z.infer<typeof createTestAttemptBodySchema>;
 export type ImportGoogleSheetBody = z.infer<typeof importGoogleSheetBodySchema>;
 export type TestFormValues = z.infer<ReturnType<typeof createTestFormSchema>>;
 export type DeleteTestAttemptsBody = z.infer<typeof deleteTestAttemptsBodySchema>;
+export type AddTestQuestionBody = z.infer<typeof addTestQuestionBodySchema>;
+export type UpdateTestQuestionBody = z.infer<typeof updateTestQuestionBodySchema>;

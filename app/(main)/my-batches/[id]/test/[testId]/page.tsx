@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBreadcrumb } from "@/store/BreadcrumbContext";
 import { useRouter } from "nextjs-toploader/app";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Upload, FileSpreadsheet, Save, Users, TrendingUp, Award, BellRing, Plus, X, Download, MessageCircle, Trash2 } from "lucide-react";
+import { useParams, useSearchParams } from "next/navigation";
+import { ArrowLeft, Upload, FileSpreadsheet, Save, Users, TrendingUp, Award, BellRing, Plus, X, Download, MessageCircle, Trash2, GripVertical, BookOpenText, BarChart3, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { fetchTestById, fetchTestAttempts, createTestAttempt, notifyTestAttempt, deleteTestAttempts, type TestAttemptListItem, type CreateTestAttemptPayload } from "@/lib/api/tests";
+import { fetchTestById, fetchTestAttempts, createTestAttempt, notifyTestAttempt, deleteTestAttempts, updateMockTest, type TestAttemptListItem, type CreateTestAttemptPayload } from "@/lib/api/tests";
+import { fetchTestQuestions, addTestQuestion, updateTestQuestion, removeTestQuestion, type TestQuestionListItem } from "@/lib/api/tests";
 import { fetchBatchById, fetchStudentsInBatch, type StudentInBatch } from "@/lib/api/batches";
 import { ExamType } from "@prisma/client";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { fetchQuestions, type QuestionListItem } from "@/lib/api/questions";
+import { fetchTopicsBySubject, type TopicListItem } from "@/lib/api/topics";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -24,6 +27,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
+    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "react-hot-toast";
 import LoadingButton from "@/components/LoadingButton";
@@ -50,9 +54,37 @@ type EditableAttempt = {
     isNew?: boolean;
 };
 
+type TabKey = "questions" | "marks-entry" | "results-analysis";
+
+const TAB_ITEMS: { key: TabKey; label: string }[] = [
+    { key: "questions", label: "Questions" },
+    { key: "marks-entry", label: "Marks Entry" },
+    { key: "results-analysis", label: "Results & Analysis" },
+];
+
+const SUBJECT_OPTIONS = [
+    { value: "PHYSICS", label: "Physics" },
+    { value: "CHEMISTRY", label: "Chemistry" },
+    { value: "MATHEMATICS", label: "Mathematics" },
+    { value: "ZOOLOGY", label: "Zoology" },
+    { value: "BOTANY", label: "Botany" },
+] as const;
+
+const DIFFICULTY_OPTIONS = [
+    { value: "EASY", label: "Easy" },
+    { value: "MODERATE", label: "Moderate" },
+    { value: "HARD", label: "Hard" },
+] as const;
+
+function truncateText(value: string, length: number): string {
+    if (value.length <= length) return value;
+    return `${value.slice(0, length)}...`;
+}
+
 export default function TestDetailPage() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const batchId = params.id as string;
     const testId = params.testId as string;
     const queryClient = useQueryClient();
@@ -62,6 +94,8 @@ export default function TestDetailPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
     const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+    const [downloadTemplateType, setDownloadTemplateType] = useState<"subject-marks" | "question-answers">("subject-marks");
+    // const [uploadTemplateKind, setUploadTemplateKind] = useState<"auto" | "subject-marks" | "question-answers">("auto");
     const [savingStudentId, setSavingStudentId] = useState<string | null>(null);
     const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
     const [sheetUrl, setSheetUrl] = useState("");
@@ -69,6 +103,17 @@ export default function TestDetailPage() {
     const [notifyingAttemptId, setNotifyingAttemptId] = useState<string | null>(null);
     const [selectedAttemptIds, setSelectedAttemptIds] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
+    const [removingQuestionIds, setRemovingQuestionIds] = useState<Set<string>>(new Set());
+    const [questionSearch, setQuestionSearch] = useState("");
+    const [questionSubject, setQuestionSubject] = useState<string>("");
+    const [questionTopicId, setQuestionTopicId] = useState<string>("");
+    const [questionDifficulty, setQuestionDifficulty] = useState<string>("");
+
+    const tabFromUrl = searchParams.get("tab");
+    const activeTab: TabKey = TAB_ITEMS.some((item) => item.key === tabFromUrl)
+        ? (tabFromUrl as TabKey)
+        : "questions";
 
     const { setBreadcrumb } = useBreadcrumb();
 
@@ -94,6 +139,14 @@ export default function TestDetailPage() {
         }
     }, [batch, test, batchId, setBreadcrumb]);
 
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        const isValid = TAB_ITEMS.some((item) => item.key === tab);
+        if (!isValid) {
+            router.replace(`/my-batches/${batchId}/test/${testId}?tab=questions`);
+        }
+    }, [searchParams, router, batchId, testId]);
+
     const { data: attempts = [], isLoading: attemptsLoading } = useQuery({
         queryKey: ["test-attempts", testId],
         queryFn: () => fetchTestAttempts(testId),
@@ -104,6 +157,36 @@ export default function TestDetailPage() {
         queryKey: ["batch-students", batchId],
         queryFn: () => fetchStudentsInBatch(batchId),
         enabled: !!batchId,
+    });
+
+    const listQuestionParams = {
+        page: 1,
+        limit: 100,
+        search: questionSearch || undefined,
+        subject: questionSubject || undefined,
+        difficulty: questionDifficulty || undefined,
+        sortBy: "createdAt" as const,
+        sortOrder: "desc" as const,
+    };
+
+    const { data: questionBankResponse, isLoading: questionBankLoading } = useQuery({
+        queryKey: ["questions", "test-builder", listQuestionParams],
+        queryFn: () => fetchQuestions(listQuestionParams),
+        enabled: !!testId,
+    });
+
+    const questionBank = questionBankResponse?.data ?? [];
+
+    const { data: topicOptions = [] } = useQuery({
+        queryKey: ["topics", "test-builder", questionSubject],
+        queryFn: () => fetchTopicsBySubject(questionSubject),
+        enabled: !!questionSubject,
+    });
+
+    const { data: testQuestions = [], isLoading: testQuestionsLoading } = useQuery({
+        queryKey: ["test-questions", testId],
+        queryFn: () => fetchTestQuestions(testId),
+        enabled: !!testId,
     });
 
     const saveMutation = useMutation({
@@ -143,6 +226,177 @@ export default function TestDetailPage() {
             toast.error(e.message || "Failed to delete attempts");
         },
     });
+
+    const addQuestionMutation = useMutation({
+        mutationFn: (questionId: string) => addTestQuestion(testId, { questionId, marks: 4, negMarks: 1 }),
+        onSuccess: () => {
+            toast.success("Question added to test");
+            queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
+        },
+        onError: (e: Error) => toast.error(e.message || "Failed to add question"),
+    });
+
+    const updateQuestionMutation = useMutation({
+        mutationFn: ({
+            testQuestionId,
+            payload,
+        }: {
+            testQuestionId: string;
+            payload: { marks?: number; negMarks?: number };
+        }) => updateTestQuestion(testId, testQuestionId, payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
+        },
+        onError: (e: Error) => toast.error(e.message || "Failed to update test question"),
+    });
+
+    const removeQuestionMutation = useMutation({
+        mutationFn: (testQuestionId: string) => removeTestQuestion(testId, testQuestionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
+        },
+    });
+
+    const addedQuestionIds = useMemo(
+        () => new Set(testQuestions.map((q: TestQuestionListItem) => q.questionId)),
+        [testQuestions]
+    );
+
+    const allowedSubjectValues = batch?.examType === ExamType.JEE
+        ? ["PHYSICS", "CHEMISTRY", "MATHEMATICS"]
+        : batch?.examType === ExamType.NEET
+            ? ["PHYSICS", "CHEMISTRY", "ZOOLOGY", "BOTANY"]
+            : SUBJECT_OPTIONS.map((s) => s.value);
+
+    const allowedSubjectSet = useMemo(
+        () => new Set(allowedSubjectValues),
+        [batch?.examType]
+    );
+
+    const filteredQuestionBank = useMemo(() => {
+        return questionBank
+            .filter((q: QuestionListItem) => allowedSubjectSet.has(q.subject))
+            .filter((q: QuestionListItem) => (!questionTopicId ? true : q.topicId === questionTopicId));
+    }, [questionBank, questionTopicId, allowedSubjectSet]);
+
+    const testQuestionsTotal = useMemo(
+        () => testQuestions.reduce((sum: number, q: TestQuestionListItem) => sum + (q.marks || 0), 0),
+        [testQuestions]
+    );
+
+    const currentSubjectTotals = useMemo(() => {
+        const totals: Record<string, number> = {
+            PHYSICS: 0,
+            CHEMISTRY: 0,
+            MATHEMATICS: 0,
+            ZOOLOGY: 0,
+            BOTANY: 0,
+        };
+
+        for (const q of testQuestions) {
+            const subject = q.question.subject;
+            totals[subject] = (totals[subject] ?? 0) + (q.marks || 0);
+        }
+
+        return totals;
+    }, [testQuestions]);
+
+    const savedTotalMarks = test?.totalMarks ?? 0;
+    const savedSubjectTotals = useMemo(() => {
+        return {
+            PHYSICS: test?.totalMarksPhysics ?? 0,
+            CHEMISTRY: test?.totalMarksChemistry ?? 0,
+            MATHEMATICS: test?.totalMarksMathematics ?? 0,
+            ZOOLOGY: test?.totalMarksZoology ?? 0,
+            BOTANY: test?.totalMarksBotany ?? 0,
+        };
+    }, [
+        test?.totalMarksPhysics,
+        test?.totalMarksChemistry,
+        test?.totalMarksMathematics,
+        test?.totalMarksZoology,
+        test?.totalMarksBotany,
+    ]);
+
+    const syncMarksMutation = useMutation({
+        mutationFn: async () => {
+            if (!test) return null;
+
+            if (isJEE) {
+                const physics = Math.round(currentSubjectTotals.PHYSICS);
+                const chemistry = Math.round(currentSubjectTotals.CHEMISTRY);
+                const mathematics = Math.round(currentSubjectTotals.MATHEMATICS);
+                const totalMarks = physics + chemistry + mathematics;
+
+                return updateMockTest(testId, {
+                    totalMarks,
+                    totalMarksPhysics: physics,
+                    totalMarksChemistry: chemistry,
+                    totalMarksMathematics: mathematics,
+                    totalMarksZoology: null,
+                    totalMarksBotany: null,
+                });
+            }
+
+            // NEET (physics + chemistry + zoology + botany)
+            const physics = Math.round(currentSubjectTotals.PHYSICS);
+            const chemistry = Math.round(currentSubjectTotals.CHEMISTRY);
+            const zoology = Math.round(currentSubjectTotals.ZOOLOGY);
+            const botany = Math.round(currentSubjectTotals.BOTANY);
+            const totalMarks = physics + chemistry + zoology + botany;
+
+            return updateMockTest(testId, {
+                totalMarks,
+                totalMarksPhysics: physics,
+                totalMarksChemistry: chemistry,
+                totalMarksZoology: zoology,
+                totalMarksBotany: botany,
+                totalMarksMathematics: null,
+            });
+        },
+        onSuccess: () => {
+            toast.success("Test marks synced successfully");
+            queryClient.invalidateQueries({ queryKey: ["test", testId] });
+        },
+        onError: (e: Error) => {
+            toast.error(e.message || "Failed to sync test marks");
+        },
+    });
+
+    const syncDisabled = syncMarksMutation.isPending || testQuestionsLoading;
+
+    const syncIsJEE = batch?.examType === ExamType.JEE;
+
+    const syncCurrent = syncIsJEE
+        ? {
+            physics: Math.round(currentSubjectTotals.PHYSICS),
+            chemistry: Math.round(currentSubjectTotals.CHEMISTRY),
+            mathematics: Math.round(currentSubjectTotals.MATHEMATICS),
+            zoology: 0,
+            botany: 0,
+        }
+        : {
+            physics: Math.round(currentSubjectTotals.PHYSICS),
+            chemistry: Math.round(currentSubjectTotals.CHEMISTRY),
+            zoology: Math.round(currentSubjectTotals.ZOOLOGY),
+            botany: Math.round(currentSubjectTotals.BOTANY),
+            mathematics: 0,
+        };
+
+    const syncCurrentTotalMarks = syncIsJEE
+        ? syncCurrent.physics + syncCurrent.chemistry + syncCurrent.mathematics
+        : syncCurrent.physics + syncCurrent.chemistry + syncCurrent.zoology + syncCurrent.botany;
+
+    const syncHasChanges = syncIsJEE
+        ? syncCurrentTotalMarks !== savedTotalMarks ||
+          syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
+          syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
+          syncCurrent.mathematics !== savedSubjectTotals.MATHEMATICS
+        : syncCurrentTotalMarks !== savedTotalMarks ||
+          syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
+          syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
+          syncCurrent.zoology !== savedSubjectTotals.ZOOLOGY ||
+          syncCurrent.botany !== savedSubjectTotals.BOTANY;
 
     const handleAddStudent = () => {
         if (!newStudentId) {
@@ -282,12 +536,12 @@ export default function TestDetailPage() {
         }
     };
 
-    const handleDownloadTemplate = async (includeStudents: boolean) => {
+    const handleDownloadTemplate = async (includeStudents: boolean, templateType: "subject-marks" | "question-answers") => {
         try {
             setIsDownloadingTemplate(true);
             setIsTemplateDialogOpen(false);
             const response = await fetch(
-                `/api/v1/tests/${testId}/download-template?includeStudents=${includeStudents ? "true" : "false"}`
+                `/api/v1/tests/${testId}/download-template?includeStudents=${includeStudents ? "true" : "false"}&templateType=${templateType}`
             );
             if (!response.ok) {
                 const error = await response.json().catch(() => ({ error: "Failed to download template" }));
@@ -298,7 +552,7 @@ export default function TestDetailPage() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${test?.name || "template"}_template.xlsx`;
+            a.download = `${test?.name || "template"}_${templateType}_template.xlsx`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -317,6 +571,9 @@ export default function TestDetailPage() {
             setIsUploading(true);
             const formData = new FormData();
             formData.append("file", file);
+            // if (uploadTemplateKind !== "auto") {
+            //     formData.append("templateKind", uploadTemplateKind);
+            // }
 
             const response = await fetch(`/api/v1/tests/${testId}/upload-attempts`, {
                 method: "POST",
@@ -425,6 +682,27 @@ export default function TestDetailPage() {
         setIsDeleteDialogOpen(true);
     };
 
+    const handleTabChange = (tab: TabKey) => {
+        router.push(`/my-batches/${batchId}/test/${testId}?tab=${tab}`);
+    };
+
+    const handleUpdateTestQuestionMarks = (
+        testQuestionId: string,
+        field: "marks" | "negMarks",
+        rawValue: string
+    ) => {
+        const parsed = rawValue === "" ? 0 : Number(rawValue);
+        if (Number.isNaN(parsed) || parsed < 0) {
+            toast.error(`${field === "marks" ? "Marks" : "Negative marks"} must be a non-negative number`);
+            return;
+        }
+
+        updateQuestionMutation.mutate({
+            testQuestionId,
+            payload: { [field]: parsed },
+        });
+    };
+
     if (batchLoading || testLoading) {
         return (
             <div className="space-y-6">
@@ -508,6 +786,348 @@ export default function TestDetailPage() {
                 </div>
             </div>
 
+            <div className="rounded-lg border border-border bg-card p-1 w-full sm:w-fit">
+                <div className="flex flex-wrap gap-1">
+                    {TAB_ITEMS.map((tab) => (
+                        <Button
+                            key={tab.key}
+                            type="button"
+                            variant={activeTab === tab.key ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => handleTabChange(tab.key)}
+                            className="rounded-md"
+                        >
+                            {tab.label}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+
+            {activeTab === "questions" && (
+                <div className="space-y-4">
+                    <div className="rounded-lg border border-border bg-card p-4 card-shadow">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <BookOpenText className="h-4 w-4 text-primary" />
+                            <p className="text-sm font-semibold text-foreground">
+                                {testQuestions.length} question{testQuestions.length === 1 ? "" : "s"} added
+                            </p>
+                            <span className="text-muted-foreground">•</span>
+                            <p className="text-sm text-muted-foreground">
+                                Total marks: <span className="font-semibold text-foreground">{testQuestionsTotal}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border bg-card p-4 card-shadow">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="flex items-center gap-2">
+                                <Award className="h-4 w-4 text-primary" />
+                                <div>
+                                    <h3 className="text-sm font-bold text-foreground">Test-level Marks</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        Current is computed from the questions added to this test.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <LoadingButton
+                                loading={syncMarksMutation.isPending}
+                                disabled={syncDisabled || !syncHasChanges}
+                                className="gap-2 h-9 px-3 rounded-md"
+                                onClick={() => syncMarksMutation.mutate()}
+                            >
+                                {syncHasChanges ? (
+                                    <>
+                                        <Save size={14} />
+                                        Sync marks to test
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={14} className="text-success" />
+                                        In sync
+                                    </>
+                                )}
+                            </LoadingButton>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
+                            {isJEE ? (
+                                <>
+                                    <StatRow label="Physics" current={syncCurrent.physics} saved={savedSubjectTotals.PHYSICS} />
+                                    <StatRow
+                                        label="Chemistry"
+                                        current={syncCurrent.chemistry}
+                                        saved={savedSubjectTotals.CHEMISTRY}
+                                    />
+                                    <StatRow
+                                        label="Mathematics"
+                                        current={syncCurrent.mathematics}
+                                        saved={savedSubjectTotals.MATHEMATICS}
+                                    />
+                                    <StatRow label="Total" current={syncCurrentTotalMarks} saved={savedTotalMarks} isTotal />
+                                </>
+                            ) : (
+                                <>
+                                    <StatRow label="Physics" current={syncCurrent.physics} saved={savedSubjectTotals.PHYSICS} />
+                                    <StatRow
+                                        label="Chemistry"
+                                        current={syncCurrent.chemistry}
+                                        saved={savedSubjectTotals.CHEMISTRY}
+                                    />
+                                    <StatRow label="Zoology" current={syncCurrent.zoology} saved={savedSubjectTotals.ZOOLOGY} />
+                                    <StatRow label="Botany" current={syncCurrent.botany} saved={savedSubjectTotals.BOTANY} />
+                                    <StatRow
+                                        label="Total"
+                                        current={syncCurrentTotalMarks}
+                                        saved={savedTotalMarks}
+                                        isTotal
+                                    />
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                        <div className="rounded-lg border border-border bg-card p-4 card-shadow space-y-4">
+                            <h2 className="text-sm font-bold text-foreground">Question Bank Browser</h2>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <Input
+                                    placeholder="Search questions..."
+                                    value={questionSearch}
+                                    onChange={(e) => setQuestionSearch(e.target.value)}
+                                    className="md:col-span-2"
+                                />
+                                <Select value={questionSubject || "all"} onValueChange={(v) => {
+                                    setQuestionSubject(v === "all" ? "" : v);
+                                    setQuestionTopicId("");
+                                }}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Subject" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All allowed subjects</SelectItem>
+                                        {SUBJECT_OPTIONS.filter((s) => allowedSubjectSet.has(s.value)).map((s) => (
+                                            <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select
+                                    value={questionTopicId || "all"}
+                                    onValueChange={(v) => setQuestionTopicId(v === "all" ? "" : v)}
+                                    disabled={!questionSubject}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Topic" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All topics</SelectItem>
+                                        {topicOptions.map((t: TopicListItem) => (
+                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={questionDifficulty || "all"} onValueChange={(v) => setQuestionDifficulty(v === "all" ? "" : v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Difficulty" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All difficulties</SelectItem>
+                                        {DIFFICULTY_OPTIONS.map((d) => (
+                                            <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2 max-h-[560px] overflow-auto pr-1">
+                                {questionBankLoading ? (
+                                    <p className="text-sm text-muted-foreground py-4">Loading question bank...</p>
+                                ) : filteredQuestionBank.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground py-4">No questions found for current filters.</p>
+                                ) : (
+                                    filteredQuestionBank.map((question: QuestionListItem) => {
+                                        const isAdded = addedQuestionIds.has(question.id);
+                                        return (
+                                            <div
+                                                key={question.id}
+                                                className="rounded-lg border border-border bg-card p-3.5 space-y-3 transition-all hover:border-primary/40 hover:shadow-sm"
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <p className="text-sm font-medium text-foreground leading-5">
+                                                        {truncateText(question.text, 130)}
+                                                    </p>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                    <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium">
+                                                        {question.subject}
+                                                    </span>
+                                                    <span className="rounded-full bg-muted px-2.5 py-1 text-foreground">
+                                                        {question.topicName ?? "No topic"}
+                                                    </span>
+                                                    <span className="rounded-full bg-muted px-2.5 py-1 text-foreground">
+                                                        {question.difficulty}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-end">
+                                                    <LoadingButton
+                                                        size="sm"
+                                                        className="min-w-[120px]"
+                                                        variant={isAdded ? "outline" : "default"}
+                                                        loading={addingQuestionIds.has(question.id) && addQuestionMutation.isPending}
+                                                        disabled={isAdded}
+                                                        onClick={() => {
+                                                            setAddingQuestionIds((prev) => {
+                                                                const next = new Set(prev);
+                                                                next.add(question.id);
+                                                                return next;
+                                                            });
+                                                            addQuestionMutation.mutate(question.id, {
+                                                                onSettled: () => {
+                                                                    setAddingQuestionIds((prev) => {
+                                                                        const next = new Set(prev);
+                                                                        next.delete(question.id);
+                                                                        return next;
+                                                                    });
+                                                                },
+                                                            });
+                                                        }}
+                                                    >
+                                                        {isAdded
+                                                            ? "Added"
+                                                            : addingQuestionIds.has(question.id) &&
+                                                                addQuestionMutation.isPending
+                                                              ? "Adding..."
+                                                              : "Add to Test"}
+                                                    </LoadingButton>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-card p-4 card-shadow space-y-4">
+                            <h2 className="text-sm font-bold text-foreground">Questions in This Test</h2>
+                            <div className="space-y-2 max-h-[560px] overflow-auto pr-1">
+                                {testQuestionsLoading ? (
+                                    <p className="text-sm text-muted-foreground py-4">Loading test questions...</p>
+                                ) : testQuestions.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground py-4">No questions added yet.</p>
+                                ) : (
+                                    testQuestions.map((item: TestQuestionListItem, index: number) => (
+                                        <div key={item.id} className="rounded-md border border-border p-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex items-center gap-1 text-muted-foreground">
+                                                    <GripVertical className="h-4 w-4" />
+                                                    <span className="text-xs font-mono">{index + 1}</span>
+                                                </div>
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className="text-sm text-foreground">{truncateText(item.question.text, 140)}</p>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive h-8 w-8 p-0.5"
+                                                            onClick={() => {
+                                                                setRemovingQuestionIds((prev) => {
+                                                                    const next = new Set(prev);
+                                                                    next.add(item.id);
+                                                                    return next;
+                                                                });
+
+                                                                void toast.promise(
+                                                                    removeQuestionMutation
+                                                                        .mutateAsync(item.id)
+                                                                        .finally(() => {
+                                                                            setRemovingQuestionIds((prev) => {
+                                                                                const next = new Set(prev);
+                                                                                next.delete(item.id);
+                                                                                return next;
+                                                                            });
+                                                                        }),
+                                                                    {
+                                                                        loading: "Removing...",
+                                                                        success: "Question removed",
+                                                                        error: (err) =>
+                                                                            err instanceof Error
+                                                                                ? err.message || "Failed to remove question"
+                                                                                : "Failed to remove question",
+                                                                    }
+                                                                );
+                                                            }}
+                                                            disabled={removingQuestionIds.has(item.id)}
+                                                            title="Remove question"
+                                                            aria-label="Remove question"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-3 items-center">
+                                                        <span className="text-xs text-muted-foreground">{item.question.subject}</span>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] font-medium text-muted-foreground">
+                                                                Marks
+                                                            </span>
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                step={1}
+                                                                defaultValue={item.marks}
+                                                                className="w-20 h-8 text-xs"
+                                                                aria-label="Marks for correct answer"
+                                                                onBlur={(e) =>
+                                                                    handleUpdateTestQuestionMarks(item.id, "marks", e.target.value)
+                                                                }
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] font-medium text-muted-foreground">
+                                                                Negative
+                                                            </span>
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                step={0.25}
+                                                                defaultValue={item.negMarks}
+                                                                className="w-20 h-8 text-xs"
+                                                                aria-label="Negative marks"
+                                                                onBlur={(e) =>
+                                                                    handleUpdateTestQuestionMarks(item.id, "negMarks", e.target.value)
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="border-t border-border pt-3 flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Running total marks</span>
+                                <span className="font-semibold text-foreground">{testQuestionsTotal}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "results-analysis" && (
+                <div className="min-h-[360px] rounded-lg border border-dashed border-border bg-card flex flex-col items-center justify-center text-center p-6">
+                    <BarChart3 className="h-8 w-8 text-muted-foreground mb-3" />
+                    <p className="text-base font-medium text-foreground mb-1">Results & Analysis coming soon.</p>
+                    <p className="text-sm text-muted-foreground max-w-xl">
+                        Once marks are submitted, you&apos;ll see class performance overview and per-student question analysis here.
+                    </p>
+                </div>
+            )}
+
+            {activeTab === "marks-entry" && (
+                <>
+
             {/* Import & Bulk Upload section */}
             <div>
                 <div className="flex items-center justify-between mb-3">
@@ -532,7 +1152,26 @@ export default function TestDetailPage() {
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-bold text-foreground">Upload Excel</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">Upload marks from an Excel (.xls or .xlsx) file</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Upload either marks template or question-answer attempt template (.xls/.xlsx)
+                                </p>
+                                {/* <div className="mt-2 w-[220px]">
+                                    <Select
+                                        value={uploadTemplateKind}
+                                        onValueChange={(value: "auto" | "subject-marks" | "question-answers") =>
+                                            setUploadTemplateKind(value)
+                                        }
+                                    >
+                                        <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="Template type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="auto">Auto detect</SelectItem>
+                                            <SelectItem value="subject-marks">Marks template</SelectItem>
+                                            <SelectItem value="question-answers">Question-answer template</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div> */}
                                 <div className="mt-3 flex items-center gap-2">
                                     <label className="flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
                                         <Upload size={14} />
@@ -624,8 +1263,24 @@ export default function TestDetailPage() {
                     <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg border border-border">
                         <h3 className="text-base font-semibold text-foreground mb-2">Download Excel Template</h3>
                         <p className="text-xs text-muted-foreground mb-4">
-                            Do you want the template pre-filled with students and roll numbers from this batch, or an empty template?
+                            Choose a template type, then decide whether to pre-fill students.
                         </p>
+                        <div className="mb-4">
+                            <Select
+                                value={downloadTemplateType}
+                                onValueChange={(value: "subject-marks" | "question-answers") =>
+                                    setDownloadTemplateType(value)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select template type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="subject-marks">Marks Template (subject-wise)</SelectItem>
+                                    <SelectItem value="question-answers">Attempt Template (question-wise)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="flex flex-col sm:flex-row justify-end gap-2">
                             <Button
                                 variant="outline"
@@ -638,7 +1293,7 @@ export default function TestDetailPage() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => void handleDownloadTemplate(false)}
+                                onClick={() => void handleDownloadTemplate(false, downloadTemplateType)}
                                 disabled={isDownloadingTemplate}
                             >
                                 Without Students
@@ -646,7 +1301,7 @@ export default function TestDetailPage() {
                             <Button
                                 size="sm"
                                 className="gap-1"
-                                onClick={() => void handleDownloadTemplate(true)}
+                                onClick={() => void handleDownloadTemplate(true, downloadTemplateType)}
                                 disabled={isDownloadingTemplate}
                             >
                                 {isDownloadingTemplate ? (
@@ -691,7 +1346,7 @@ export default function TestDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                        <AlertDialogAction asChild>
+                        <AlertDialogTrigger asChild>
                             <Button
                                 variant="destructive"
                                 size="sm"
@@ -702,7 +1357,7 @@ export default function TestDetailPage() {
                                 <Trash2 className="h-4 w-4" />
                                 <span className="hidden sm:inline">Delete Selected</span>
                             </Button>
-                        </AlertDialogAction>
+                        </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Delete selected attempts?</AlertDialogTitle>
@@ -1061,6 +1716,8 @@ export default function TestDetailPage() {
             <p className="text-xs text-center text-muted-foreground">
                 Marks will be auto-saved and reflected in student dashboards, results & parent app.
             </p>
+                </>
+            )}
         </div>
     );
 }
@@ -1071,6 +1728,50 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Users; label: string;
             <Icon size={16} className="text-muted-foreground" />
             <span className="text-xs text-muted-foreground">{label}</span>
             <span className="text-sm font-bold font-mono text-foreground">{value}</span>
+        </div>
+    );
+}
+
+function StatRow({
+    label,
+    current,
+    saved,
+    isTotal,
+}: {
+    label: string;
+    current: number;
+    saved: number;
+    isTotal?: boolean;
+}) {
+    const mismatch = current !== saved;
+
+    return (
+        <div
+            className={cn(
+                "rounded-md border border-border bg-muted/20 px-3 py-2.5 flex items-start justify-between gap-3",
+                mismatch ? "border-destructive/30 bg-destructive/5" : "bg-muted/20"
+            )}
+        >
+            <div>
+                <div className="text-xs text-muted-foreground">{label}</div>
+                <div className={cn("mt-0.5 flex items-baseline gap-2", isTotal ? "font-semibold" : "")}>
+                    <span className={cn("text-sm font-mono", mismatch ? "text-destructive" : "text-foreground")}>
+                        {current}
+                    </span>
+                    <span className="text-[12px] text-muted-foreground">/ {saved}</span>
+                </div>
+            </div>
+
+            <div className="shrink-0">
+                <span
+                    className={cn(
+                        "text-[10px] font-semibold uppercase tracking-wide",
+                        mismatch ? "text-destructive" : "text-emerald-600"
+                    )}
+                >
+                    {mismatch ? "Not synced" : "Synced"}
+                </span>
+            </div>
         </div>
     );
 }

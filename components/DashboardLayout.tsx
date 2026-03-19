@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Users,
   BookOpen,
+  FileText,
   LogOutIcon,
   LucideIcon,
 } from "lucide-react";
@@ -56,6 +57,9 @@ const allNavItems: NavItem[] = [
   { title: "Topics", path: "/topics", icon: BookOpen, roles: [RoleEnum.FACULTY] },
   { title: "Questions", path: "/questions", icon: PenTool, roles: [RoleEnum.FACULTY] },
 
+  // existing student items
+  { title: "My Tests", path: "/my-tests", icon: FileText, roles: [RoleEnum.STUDENT] },
+
   // existing admin items
   { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
   { title: "User Management", path: "/admin/users", icon: ShieldCheck, roles: [RoleEnum.ADMIN] },
@@ -73,6 +77,9 @@ const pageTitles: Record<string, string> = {
   "/results": "Exam Results",
   "/predicter": "AI Rank Predictor",
   "/whatsapp": "WhatsApp Notifications",
+
+  // student pages
+  "/my-tests": "My Tests",
 
   // admin pages
   "/batches": "Batches",

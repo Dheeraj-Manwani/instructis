@@ -543,7 +543,6 @@ function QuestionModal({
   const onSubmit = (values: QuestionFormValues) => {
     const payload: CreateQuestionPayload = {
       text: values.text,
-      type: "MCQ",
       difficulty: values.difficulty,
       subject: values.subject,
       topicId: values.topicId || undefined,

@@ -342,3 +342,61 @@ export async function findFacultiesInBatch(
     },
   }));
 }
+
+export async function deleteBatchByIdCascade(batchId: string): Promise<void> {
+  const existing = await prisma.batch.findUnique({
+    where: { id: batchId },
+    select: { id: true },
+  });
+
+  if (!existing) throw new NotFoundError("Batch not found");
+
+  // Note: avoid an interactive transaction here because a batch can have many related rows.
+  // Running ordered statements keeps referential integrity while preventing `tx` invalidation (P2028).
+
+  // Detach students and marks from the batch first to avoid FK issues.
+  await prisma.student.updateMany({
+    where: { batchId },
+    data: { batchId: null },
+  });
+
+  await prisma.mark.updateMany({
+    where: { batchId },
+    data: { batchId: null },
+  });
+
+  // Delete dependent rows under mock tests for this batch.
+  await prisma.studentAnswer.deleteMany({
+    where: {
+      attempt: {
+        mockTest: { batchId },
+      },
+    },
+  });
+
+  await prisma.testAttempt.deleteMany({
+    where: {
+      mockTest: { batchId },
+    },
+  });
+
+  await prisma.mockTestQuestion.deleteMany({
+    where: {
+      mockTest: { batchId },
+    },
+  });
+
+  await prisma.mockTest.deleteMany({
+    where: { batchId },
+  });
+
+  // Detach faculties from the batch.
+  await prisma.batchFaculty.deleteMany({
+    where: { batchId },
+  });
+
+  // Finally delete the batch itself.
+  await prisma.batch.delete({
+    where: { id: batchId },
+  });
+}

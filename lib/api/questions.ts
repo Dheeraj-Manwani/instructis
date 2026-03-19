@@ -3,7 +3,7 @@ import { api } from "./axios";
 export type QuestionListItem = {
   id: string;
   text: string;
-  type: string;
+  type?: string;
   difficulty: string;
   subject: string;
   topicId: string | null;
@@ -23,10 +23,9 @@ export type ListQuestionsParams = {
   limit?: number;
   search?: string;
   subject?: string;
-  type?: string;
   difficulty?: string;
   isPublished?: boolean;
-  sortBy?: "createdAt" | "subject" | "difficulty" | "type";
+  sortBy?: "createdAt" | "subject" | "difficulty";
   sortOrder?: "asc" | "desc";
 };
 
@@ -55,7 +54,7 @@ export async function fetchQuestionById(id: string): Promise<QuestionWithOptions
 
 export type CreateQuestionPayload = {
   text: string;
-  type: string;
+  type?: string;
   difficulty: string;
   subject: string;
   topicId?: string;

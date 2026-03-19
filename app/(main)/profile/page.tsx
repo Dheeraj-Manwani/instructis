@@ -44,13 +44,24 @@ function formatDateForInput(date: Date | string | null): string {
   return d.toISOString().slice(0, 10);
 }
 
+function normalizeTargetExam(
+  value: unknown
+): "JEE" | "NEET" | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "JEE" || normalized === "NEET") {
+    return normalized as "JEE" | "NEET";
+  }
+  return undefined;
+}
+
 function profileToFormValues(profile: Profile): ProfileFormValues {
   const { user, student, faculty } = profile;
   return {
     name: user.name,
     image: user.image ?? "",
     rollNo: student?.rollNo ?? "",
-    targetExam: (student?.targetExam as "JEE" | "NEET") ?? undefined,
+    targetExam: normalizeTargetExam(student?.targetExam),
     parentName: student?.parentName ?? "",
     parentPhone: student?.parentPhone ?? "",
     parentEmail: student?.parentEmail ?? "",
@@ -275,7 +286,7 @@ export default function ProfilePage() {
                           <FormLabel>Target exam</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            value={field.value ?? ""}
+                            value={field.value ?? undefined}
                           >
                             <FormControl>
                               <SelectTrigger>

@@ -72,6 +72,10 @@ export async function updateBatch(
   return res.data;
 }
 
+export async function deleteBatch(id: string): Promise<void> {
+  await api.delete(`/batches/${id}`);
+}
+
 export type UserListItem = {
   id: string;
   name: string;

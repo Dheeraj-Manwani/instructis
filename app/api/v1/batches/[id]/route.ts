@@ -30,3 +30,12 @@ export const PATCH = catchAsync(async (req: NextRequest, { params }) => {
   const batch = await batchService.updateBatch(id, body);
   return ApiResponse.success(batch, "Batch updated");
 });
+
+export const DELETE = catchAsync(async (req: NextRequest, { params }) => {
+  const session = await withAuth(req);
+  withRole(session, "ADMIN");
+
+  const { id } = batchIdParamSchema.parse(await params);
+  await batchService.deleteBatch(id);
+  return ApiResponse.success(null, "Batch deleted");
+});

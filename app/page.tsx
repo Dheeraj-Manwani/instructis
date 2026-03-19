@@ -358,7 +358,7 @@ export default function LandingPage() {
               { icon: Brain, title: "AI Rank Predictor", desc: "Predict JEE & NEET ranks using AI. Show students exactly where they stand and what to improve.", color: "from-blue-500 to-blue-600" },
               { icon: Search, title: "Per-Question Analysis", desc: "See which questions each student got wrong, with AI-generated explanations and correct solutions.", color: "from-violet-500 to-violet-600" },
               { icon: MessageSquare, title: "WhatsApp Notifications", desc: "Auto-send beautiful report cards to parents via WhatsApp the moment marks are saved.", color: "from-emerald-500 to-teal-600" },
-              { icon: FileText, title: "Question Builder", desc: "Rich-text question creation with MCQ support, difficulty levels, and explanations — built for JEE/NEET.", color: "from-amber-500 to-orange-500" },
+              { icon: FileText, title: "Question Builder", desc: "Rich-text question creation with difficulty levels and explanations — built for JEE/NEET.", color: "from-amber-500 to-orange-500" },
               { icon: BarChart3, title: "Performance Analytics", desc: "Track weak areas, improvement trends, and percentile bands for every student over time.", color: "from-pink-500 to-rose-500" },
             ].map((f, i) => (
               <motion.div

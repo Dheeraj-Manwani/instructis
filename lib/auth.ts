@@ -87,6 +87,7 @@ export const auth = betterAuth({
       },
     },
     additionalFields: {
+      // TODO: ask for target exam in auth flow for students and additional details in onboarding flow
       role: {
         type: "string",
         input: false,

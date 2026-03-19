@@ -64,7 +64,6 @@ export async function addFacultiesToBatch(batchId: string, facultyIds: string[])
 }
 
 export async function getStudentsNotInBatch(batchId: string) {
-  await batchRepository.getBatchByIdOrThrow(batchId);
   return batchRepository.findStudentsNotInBatch(batchId);
 }
 
@@ -85,4 +84,8 @@ export async function getStudentsInBatch(batchId: string) {
 export async function getFacultiesInBatch(batchId: string) {
   await batchRepository.getBatchByIdOrThrow(batchId);
   return batchRepository.findFacultiesInBatch(batchId);
+}
+
+export async function deleteBatch(batchId: string) {
+  await batchRepository.deleteBatchByIdCascade(batchId);
 }

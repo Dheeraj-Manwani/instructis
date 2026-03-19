@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -34,11 +34,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { queryKeys } from "@/lib/api/query-keys";
 import {
   fetchBatches,
   createBatch,
   updateBatch,
+  deleteBatch,
   fetchStudentsNotInBatch,
   fetchStudentsInBatch,
   fetchFacultiesNotInBatch,
@@ -54,8 +65,10 @@ import {
   downloadStudentFacultyTemplate,
   type BulkImportErrorDetail,
 } from "@/lib/api/batches";
-import { Plus, Pencil, ChevronLeft, ChevronRight, Users, UserCog } from "lucide-react";
+import { Plus, Pencil, ChevronLeft, ChevronRight, Users, UserCog, Trash2 } from "lucide-react";
+import { RoleEnum } from "@prisma/client";
 import { toast } from "react-hot-toast";
+import { getProfile } from "@/lib/api/profile";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import LoadingButton from "@/components/LoadingButton";
@@ -102,6 +115,14 @@ export default function BatchesPage() {
   const [facultiesModalOpen, setFacultiesModalOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchListItem | null>(null);
   const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  const [deleteBatchId, setDeleteBatchId] = useState<string | null>(null);
+  const deleteToastIdRef = useRef<string | null>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+  });
+  const isAdmin = profile?.user.role === RoleEnum.ADMIN;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -149,13 +170,30 @@ export default function BatchesPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.batches.lists() });
   };
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteBatch(id),
+    onMutate: () => {
+      deleteToastIdRef.current = toast.loading("Deleting batch...");
+    },
+    onSuccess: () => {
+      if (deleteToastIdRef.current) toast.dismiss(deleteToastIdRef.current);
+      toast.success("Batch deleted");
+      setDeleteBatchId(null);
+      invalidateList();
+    },
+    onError: (e: Error) => {
+      if (deleteToastIdRef.current) toast.dismiss(deleteToastIdRef.current);
+      toast.error(e.message || "Failed to delete batch");
+    },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Batches</h1>
           <p className="text-muted-foreground text-sm">
-            View and manage batches. Set a batch to inactive instead of deleting it.
+            View and manage batches. Admins can delete a batch; otherwise set it inactive.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -302,6 +340,18 @@ export default function BatchesPage() {
                             >
                               <UserCog className="h-4 w-4" />
                             </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setDeleteBatchId(b.id)}
+                                title="Delete batch"
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -400,6 +450,31 @@ export default function BatchesPage() {
         onClose={() => setBulkImportModalOpen(false)}
         batches={list}
       />
+
+      <AlertDialog
+        open={!!deleteBatchId}
+        onOpenChange={(open) => !open && setDeleteBatchId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete batch</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the batch&apos;s tests and attempts, detaches students and faculties from the
+              batch, and clears batch references. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => deleteBatchId && deleteMutation.mutate(deleteBatchId)}
+              disabled={deleteMutation.isPending}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -301,7 +301,12 @@ export default function BatchDetailPage() {
                                     {tests.map((test) => (
                                         <TableRow key={test.id}>
                                             <TableCell className="font-medium">
-                                                {test.name}
+                                                <Link
+                                                    href={`/my-batches/${batchId}/test/${test.id}`}
+                                                    className="hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm"
+                                                >
+                                                    {test.name}
+                                                </Link>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-1 text-muted-foreground">
