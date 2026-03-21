@@ -285,11 +285,12 @@ export default function ProfilePage() {
                         <FormItem>
                           <FormLabel>Target exam</FormLabel>
                           <Select
+                            key={field.value ?? "target-exam-empty"}
                             onValueChange={field.onChange}
-                            value={field.value ?? undefined}
+                            value={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select exam" />
                               </SelectTrigger>
                             </FormControl>

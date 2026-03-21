@@ -8,6 +8,7 @@ interface LoadingButtonProps extends ComponentProps<typeof Button> {
 }
 
 export default function LoadingButton({
+  // TODO: add a loadingToastId prop
   loading,
   disabled,
   className,

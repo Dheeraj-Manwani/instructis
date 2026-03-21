@@ -56,11 +56,12 @@ export default function MyTestsPage() {
                 0,
             ) / totalTestsTaken
             : null;
+    const percentileValues = testAttemptsTaken
+        .map((t) => getAttemptPercentile(t.attempt, t.test.totalMarks))
+        .filter((p): p is number => typeof p === "number");
     const bestPercentile =
-        totalTestsTaken > 0
-            ? Math.max(
-                ...testAttemptsTaken.map((t) => getAttemptPercentile(t.attempt, t.test.totalMarks) ?? 0),
-            )
+        percentileValues.length > 0
+            ? Math.max(...percentileValues)
             : null;
 
     const isJee = batch?.examType === "JEE";

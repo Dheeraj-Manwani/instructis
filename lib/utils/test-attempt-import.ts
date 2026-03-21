@@ -89,7 +89,7 @@ function detectTemplateKind(workbook: ExcelJS.Workbook): ImportTemplateKind {
         row4Headers[1] === "roll no" &&
         row4Headers[2] === "student name" &&
         row4Headers[3] === "question id" &&
-        row4Headers[4] === "selected option";
+        row4Headers[4] === "selected option (a/b/c/d)";
 
     if (isQuestionAnswer) return "question-answers";
     return "subject-marks";
@@ -109,7 +109,6 @@ function parseAndCapMark(
     if (!Number.isFinite(num) || Number.isNaN(num)) {
         throw new ValidationError(`${label} marks must be a numeric value at row ${rowIndex}`);
     }
-    if (num < 0) return 0;
     if (maxMark != null && num > maxMark) return maxMark;
     return num;
 }
@@ -214,14 +213,14 @@ function parseQuestionAnswerTemplate(
     if (!referenceSheet) throw new ValidationError("Question ID Reference sheet not found");
 
     const answerHeaders = getHeadersAtRow(answerSheet, 4, 6);
-    const expectedAnswers = ["#", "Roll No", "Student Name", "Question ID", "Selected Option", ""];
+    const expectedAnswers = ["#", "Roll No", "Student Name", "Question ID", "Selected Option (a/b/c/d)", ""];
     for (let i = 0; i < 5; i++) {
         if (answerHeaders[i] !== expectedAnswers[i]) {
             throw new ValidationError("Question Answers sheet headers do not match expected format");
         }
     }
 
-    const referenceHeaders = getHeadersAtRow(referenceSheet, 3, 11);
+    const referenceHeaders = getHeadersAtRow(referenceSheet, 3, 12);
     const expectedRef = [
         "#",
         "Question ID",
@@ -234,14 +233,19 @@ function parseQuestionAnswerTemplate(
         "Option c",
         "Option d",
         "Correct Option",
+        "Marks",
     ];
-    if (referenceHeaders.length !== expectedRef.length || !referenceHeaders.every((h, i) => h === expectedRef[i])) {
+    const matchesNewHeader = referenceHeaders.every((h, i) => h === expectedRef[i]);
+    const matchesOldHeader = referenceHeaders.slice(0, 11).every((h, i) => h === expectedRef[i]);
+    if (!matchesNewHeader && !matchesOldHeader) {
         throw new ValidationError("Question ID Reference sheet headers do not match expected format");
     }
 
     const testQuestionMap = new Map<string, TestQuestion>();
+    const testQuestionByOrderIndex = new Map<number, TestQuestion>();
     for (const q of testQuestions) {
         testQuestionMap.set(q.questionId, q);
+        testQuestionByOrderIndex.set(q.orderIndex, q);
     }
 
     type StudentAnswerRow = {
@@ -255,21 +259,26 @@ function parseQuestionAnswerTemplate(
         const row = answerSheet.getRow(rowIndex);
         const rollNo = normalizeCellValue(row.getCell(2).value);
         const name = normalizeCellValue(row.getCell(3).value);
-        const questionId = normalizeCellValue(row.getCell(4).value);
+        const questionIdCell = normalizeCellValue(row.getCell(4).value);
         const optionText = normalizeCellValue(row.getCell(5).value).toLowerCase();
 
-        if (!rollNo && !name && !questionId && !optionText) continue;
+        if (!rollNo && !name && !questionIdCell && !optionText) continue;
         if (!rollNo) throw new ValidationError(`Roll No is required at row ${rowIndex}`);
-        if (!questionId) throw new ValidationError(`Question ID is required at row ${rowIndex}`);
+        if (!questionIdCell) throw new ValidationError(`Question ID is required at row ${rowIndex}`);
 
         const student = rosterByRoll.get(rollNo);
         if (!student) {
             throw new ValidationError(`Roll No "${rollNo}" at row ${rowIndex} does not match any student in this batch`);
         }
 
-        const testQuestion = testQuestionMap.get(questionId);
+        // In templates, "Question ID" column stores test question order index.
+        // Fallback to real questionId for backward compatibility with older files.
+        const asOrderIndex = Number(questionIdCell);
+        const testQuestion = Number.isInteger(asOrderIndex)
+            ? testQuestionByOrderIndex.get(asOrderIndex) ?? testQuestionMap.get(questionIdCell)
+            : testQuestionMap.get(questionIdCell);
         if (!testQuestion) {
-            throw new ValidationError(`Question ID "${questionId}" at row ${rowIndex} does not belong to this test`);
+            throw new ValidationError(`Question ID "${questionIdCell}" at row ${rowIndex} does not belong to this test`);
         }
 
         let optionKey: "a" | "b" | "c" | "d" | null = null;
@@ -282,7 +291,7 @@ function parseQuestionAnswerTemplate(
 
         answerRows.push({
             studentId: student.id,
-            questionId,
+            questionId: testQuestion.questionId,
             optionKey,
         });
     }
@@ -347,11 +356,11 @@ function parseQuestionAnswerTemplate(
 
     const imported: ImportedAttempt[] = [];
     for (const [studentId, agg] of aggregateByStudent.entries()) {
-        const physics = Math.max(0, agg.physics);
-        const chemistry = Math.max(0, agg.chemistry);
-        const mathematics = Math.max(0, agg.mathematics);
-        const zoology = Math.max(0, agg.zoology);
-        const botany = Math.max(0, agg.botany);
+        const physics = agg.physics;
+        const chemistry = agg.chemistry;
+        const mathematics = agg.mathematics;
+        const zoology = agg.zoology;
+        const botany = agg.botany;
         const rawTotal = physics + chemistry + mathematics + zoology + botany;
         const cappedTotal = Math.min(totalMarks, rawTotal);
 

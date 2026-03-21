@@ -53,6 +53,17 @@ export const updateTestQuestionBodySchema = z.object({
     message: "At least one field is required",
 });
 
+export const reorderTestQuestionsBodySchema = z.object({
+    items: z
+        .array(
+            z.object({
+                testQuestionId: z.string().min(1, "Test question ID is required"),
+                orderIndex: z.coerce.number().int().min(1, "Order index must be at least 1"),
+            })
+        )
+        .min(1, "At least one reorder item is required"),
+});
+
 export const createMockTestBodySchema = z.object({
     name: z.string().min(1, "Test name is required"),
     batchId: z.string().nullable(),
@@ -138,3 +149,4 @@ export type TestFormValues = z.infer<ReturnType<typeof createTestFormSchema>>;
 export type DeleteTestAttemptsBody = z.infer<typeof deleteTestAttemptsBodySchema>;
 export type AddTestQuestionBody = z.infer<typeof addTestQuestionBodySchema>;
 export type UpdateTestQuestionBody = z.infer<typeof updateTestQuestionBodySchema>;
+export type ReorderTestQuestionsBody = z.infer<typeof reorderTestQuestionsBodySchema>;

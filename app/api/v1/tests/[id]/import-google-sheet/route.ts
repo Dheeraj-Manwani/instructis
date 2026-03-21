@@ -11,6 +11,7 @@ import * as mockTestService from "@/services/mock-test.service";
 import * as batchService from "@/services/batch.service";
 import prisma from "@/lib/prisma";
 import { parseImportedAttemptsFromWorkbook } from "@/lib/utils/test-attempt-import";
+import * as markRepository from "@/repositories/mark.repository";
 
 export const POST = catchAsync(async (req: NextRequest, { params }) => {
     const session = await withAuth(req);
@@ -74,31 +75,67 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
     const createdOrUpdated = [];
 
     for (const row of attempts) {
-        const attempt = await mockTestService.createOrUpdateTestAttempt({
-            studentId: row.studentId,
-            mockTestId: testId,
-            physicsMarks: row.physicsMarks,
-            chemistryMarks: row.chemistryMarks,
-            mathematicsMarks: row.mathematicsMarks,
-            zoologyMarks: row.zoologyMarks,
-            botanyMarks: row.botanyMarks,
-            totalScore: row.totalScore,
-        });
+        const percentile = test.totalMarks > 0 ? (row.totalScore / test.totalMarks) * 100 : null;
+        const attempt = await prisma.$transaction(async (tx) => {
+            const persistedAttempt = await mockTestService.createOrUpdateTestAttempt(
+                {
+                    studentId: row.studentId,
+                    mockTestId: testId,
+                    physicsMarks: row.physicsMarks,
+                    chemistryMarks: row.chemistryMarks,
+                    mathematicsMarks: row.mathematicsMarks,
+                    zoologyMarks: row.zoologyMarks,
+                    botanyMarks: row.botanyMarks,
+                    totalScore: row.totalScore,
+                    percentile,
+                },
+                tx
+            );
 
-        if (templateKind === "question-answers") {
-            await prisma.studentAnswer.deleteMany({ where: { attemptId: attempt.id } });
-            if (row.answers && row.answers.length > 0) {
-                await prisma.studentAnswer.createMany({
-                    data: row.answers.map((a) => ({
-                        attemptId: attempt.id,
-                        questionId: a.questionId,
-                        selectedOptionId: a.selectedOptionId,
-                        isCorrect: a.isCorrect,
-                        marksAwarded: a.marksAwarded,
-                    })),
-                });
+            await markRepository.syncMarksForAttempt(
+                {
+                    studentId: row.studentId,
+                    facultyId: test.facultyId,
+                    batchId: test.batchId ?? null,
+                    testName: test.name,
+                    examType: batch.examType,
+                    percentile,
+                    attemptMarks: {
+                        physicsMarks: row.physicsMarks,
+                        chemistryMarks: row.chemistryMarks,
+                        mathematicsMarks: row.mathematicsMarks,
+                        zoologyMarks: row.zoologyMarks,
+                        botanyMarks: row.botanyMarks,
+                    },
+                    testMaxMarks: {
+                        totalMarks: test.totalMarks,
+                        totalMarksPhysics: test.totalMarksPhysics,
+                        totalMarksChemistry: test.totalMarksChemistry,
+                        totalMarksMathematics: test.totalMarksMathematics,
+                        totalMarksZoology: test.totalMarksZoology,
+                        totalMarksBotany: test.totalMarksBotany,
+                    },
+                },
+                tx
+            );
+
+            if (templateKind === "question-answers") {
+                await tx.studentAnswer.deleteMany({ where: { attemptId: persistedAttempt.id } });
+                if (row.answers && row.answers.length > 0) {
+                    await tx.studentAnswer.createMany({
+                        data: row.answers.map((a) => ({
+                            attemptId: persistedAttempt.id,
+                            questionId: a.questionId,
+                            selectedOptionId: a.selectedOptionId,
+                            isCorrect: a.isCorrect,
+                            marksAwarded: a.marksAwarded,
+                        })),
+                    });
+                }
             }
-        }
+
+            return persistedAttempt;
+        }, { maxWait: 10000, timeout: 20000 });
 
         createdOrUpdated.push(attempt);
     }

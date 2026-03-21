@@ -204,6 +204,8 @@ model MockTestQuestion {
   orderIndex Int
   marks      Int      @default(4)
   negMarks   Float    @default(1)
+
+  @@unique([mockTestId, orderIndex])
 }
 
 model TestAttempt {
@@ -236,7 +238,7 @@ model TestAttempt {
 model StudentAnswer {
   id               String      @id @default(cuid())
   attemptId        String
-  attempt          TestAttempt @relation(fields: [attemptId], references: [id])
+  attempt          TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   questionId       String
   question         Question    @relation(fields: [questionId], references: [id])
   selectedOptionId String?
@@ -278,6 +280,7 @@ model RankPrediction {
   targetPercentile Float?
   targetRank       Int?
   improvementPts   Float
+  predictionJson   Json?
   createdAt        DateTime @default(now())
 }
 

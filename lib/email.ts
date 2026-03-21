@@ -119,3 +119,81 @@ export function getChangeEmailVerificationHtml(
     footer: "If you didn't request this change, you can safely ignore this email.",
   });
 }
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function getParentNotificationEmailHtml(options: {
+  title: string;
+  greeting: string;
+  lines: string[];
+  ctaLabel?: string;
+  ctaUrl?: string;
+}) {
+  const { title, greeting, lines, ctaLabel, ctaUrl } = options;
+  const safeLines = lines.map((line) => escapeHtml(line));
+  const shouldShowCta = Boolean(ctaLabel && ctaUrl);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0; padding:0; background:#f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9; padding: 28px 14px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 620px; background:#ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <tr>
+            <td style="background: linear-gradient(135deg, ${BRAND.primary} 0%, #145a2e 100%); padding: 20px 24px;">
+              <div style="font-size: 18px; font-weight: 700; color: #ffffff;">${BRAND.name}</div>
+              <div style="font-size: 12px; color: #d1fae5; margin-top: 4px;">Student progress update</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px;">
+              <h2 style="margin: 0 0 10px; font-size: 20px; color: ${BRAND.text};">${escapeHtml(title)}</h2>
+              <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.textMuted};">${escapeHtml(greeting)}</p>
+              ${safeLines
+                .map(
+                  (line) =>
+                    `<p style="margin: 0 0 10px; font-size: 14px; color: ${BRAND.text}; line-height: 1.6;">${line}</p>`
+                )
+                .join("")}
+              ${
+                shouldShowCta
+                  ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin-top: 20px;">
+                       <tr>
+                         <td style="background: ${BRAND.primary}; border-radius: 8px;">
+                           <a href="${escapeHtml(ctaUrl as string)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding: 12px 20px; color:#ffffff; text-decoration:none; font-weight:600; font-size:14px;">
+                             ${escapeHtml(ctaLabel as string)}
+                           </a>
+                         </td>
+                       </tr>
+                     </table>`
+                  : ""
+              }
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: ${BRAND.primaryLight};">
+              <p style="margin:0; font-size:12px; color:${BRAND.textMuted};">Regards, Instructis</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}

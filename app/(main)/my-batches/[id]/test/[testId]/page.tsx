@@ -11,13 +11,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { fetchTestById, fetchTestAttempts, createTestAttempt, notifyTestAttempt, deleteTestAttempts, updateMockTest, type TestAttemptListItem, type CreateTestAttemptPayload } from "@/lib/api/tests";
+import { fetchTestById, fetchTestAttempts, createTestAttempt, notifyTestAttempt, deleteTestAttempts, reorderTestQuestions, updateMockTest, type TestAttemptListItem, type CreateTestAttemptPayload } from "@/lib/api/tests";
 import { fetchTestQuestions, addTestQuestion, updateTestQuestion, removeTestQuestion, type TestQuestionListItem } from "@/lib/api/tests";
 import { fetchBatchById, fetchStudentsInBatch, type StudentInBatch } from "@/lib/api/batches";
 import { ExamType } from "@prisma/client";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { fetchQuestions, type QuestionListItem } from "@/lib/api/questions";
 import { fetchTopicsBySubject, type TopicListItem } from "@/lib/api/topics";
+import TestClassOverview from "@/components/test-results/test-class-overview";
+import TestAttemptQuestionAnalysis from "@/components/test-results/test-attempt-question-analysis";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,11 +31,12 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import LoadingButton from "@/components/LoadingButton";
 
 function getPercentileBg(percentile: number | null): string {
-    if (!percentile) return "bg-muted text-muted-foreground";
+    if (percentile === null) return "bg-muted text-muted-foreground";
     if (percentile >= 90) return "bg-success/20 text-success";
     if (percentile >= 75) return "bg-primary/20 text-primary";
     if (percentile >= 50) return "bg-warning/20 text-warning";
@@ -94,7 +97,7 @@ export default function TestDetailPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
     const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
-    const [downloadTemplateType, setDownloadTemplateType] = useState<"subject-marks" | "question-answers">("subject-marks");
+    const [downloadTemplateType, setDownloadTemplateType] = useState<"subject-marks" | "question-answers">("question-answers");
     // const [uploadTemplateKind, setUploadTemplateKind] = useState<"auto" | "subject-marks" | "question-answers">("auto");
     const [savingStudentId, setSavingStudentId] = useState<string | null>(null);
     const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
@@ -105,6 +108,10 @@ export default function TestDetailPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
     const [removingQuestionIds, setRemovingQuestionIds] = useState<Set<string>>(new Set());
+    const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+    const [reorderDraftQuestions, setReorderDraftQuestions] = useState<TestQuestionListItem[]>([]);
+    const [draggingQuestionId, setDraggingQuestionId] = useState<string | null>(null);
+    const [isUpdatingQuestionOrder, setIsUpdatingQuestionOrder] = useState(false);
     const [questionSearch, setQuestionSearch] = useState("");
     const [questionSubject, setQuestionSubject] = useState<string>("");
     const [questionTopicId, setQuestionTopicId] = useState<string>("");
@@ -114,6 +121,8 @@ export default function TestDetailPage() {
     const activeTab: TabKey = TAB_ITEMS.some((item) => item.key === tabFromUrl)
         ? (tabFromUrl as TabKey)
         : "questions";
+
+    const resultsAnalysisAttemptId = searchParams.get("analysisAttemptId");
 
     const { setBreadcrumb } = useBreadcrumb();
 
@@ -213,7 +222,14 @@ export default function TestDetailPage() {
 
     const deleteAttemptsMutation = useMutation({
         mutationFn: (attemptIds: string[]) => deleteTestAttempts(testId, attemptIds),
-        onSuccess: (data) => {
+        onMutate: () => {
+            const loadingToastId = toast.loading("Deleting selected attempts...");
+            return { loadingToastId };
+        },
+        onSuccess: (data, _variables, context) => {
+            if (context?.loadingToastId) {
+                toast.dismiss(context.loadingToastId);
+            }
             if (data.deletedCount > 0) {
                 toast.success("Selected attempts deleted successfully");
             } else {
@@ -222,7 +238,10 @@ export default function TestDetailPage() {
             setSelectedAttemptIds(new Set());
             queryClient.invalidateQueries({ queryKey: ["test-attempts", testId] });
         },
-        onError: (e: Error) => {
+        onError: (e: Error, _variables, context) => {
+            if (context?.loadingToastId) {
+                toast.dismiss(context.loadingToastId);
+            }
             toast.error(e.message || "Failed to delete attempts");
         },
     });
@@ -242,7 +261,7 @@ export default function TestDetailPage() {
             payload,
         }: {
             testQuestionId: string;
-            payload: { marks?: number; negMarks?: number };
+            payload: { marks?: number; negMarks?: number; orderIndex?: number };
         }) => updateTestQuestion(testId, testQuestionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
@@ -261,6 +280,11 @@ export default function TestDetailPage() {
         () => new Set(testQuestions.map((q: TestQuestionListItem) => q.questionId)),
         [testQuestions]
     );
+
+    const isQuestionOrderDirty = useMemo(() => {
+        if (reorderDraftQuestions.length !== testQuestions.length) return false;
+        return reorderDraftQuestions.some((item, index) => item.id !== testQuestions[index]?.id);
+    }, [reorderDraftQuestions, testQuestions]);
 
     const allowedSubjectValues = batch?.examType === ExamType.JEE
         ? ["PHYSICS", "CHEMISTRY", "MATHEMATICS"]
@@ -389,14 +413,14 @@ export default function TestDetailPage() {
 
     const syncHasChanges = syncIsJEE
         ? syncCurrentTotalMarks !== savedTotalMarks ||
-          syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
-          syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
-          syncCurrent.mathematics !== savedSubjectTotals.MATHEMATICS
+        syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
+        syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
+        syncCurrent.mathematics !== savedSubjectTotals.MATHEMATICS
         : syncCurrentTotalMarks !== savedTotalMarks ||
-          syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
-          syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
-          syncCurrent.zoology !== savedSubjectTotals.ZOOLOGY ||
-          syncCurrent.botany !== savedSubjectTotals.BOTANY;
+        syncCurrent.physics !== savedSubjectTotals.PHYSICS ||
+        syncCurrent.chemistry !== savedSubjectTotals.CHEMISTRY ||
+        syncCurrent.zoology !== savedSubjectTotals.ZOOLOGY ||
+        syncCurrent.botany !== savedSubjectTotals.BOTANY;
 
     const handleAddStudent = () => {
         if (!newStudentId) {
@@ -450,10 +474,6 @@ export default function TestDetailPage() {
         if (value !== null) {
             if (Number.isNaN(value)) {
                 toast.error(`${label} marks must be a valid number`);
-                return;
-            }
-            if (value < 0) {
-                toast.error(`${label} marks cannot be negative`);
                 return;
             }
             if (value > maxValue) {
@@ -537,6 +557,7 @@ export default function TestDetailPage() {
     };
 
     const handleDownloadTemplate = async (includeStudents: boolean, templateType: "subject-marks" | "question-answers") => {
+        const loadingToastId = toast.loading("Downloading template...");
         try {
             setIsDownloadingTemplate(true);
             setIsTemplateDialogOpen(false);
@@ -557,9 +578,9 @@ export default function TestDetailPage() {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            toast.success("Template downloaded successfully");
+            toast.success("Template downloaded successfully", { id: loadingToastId });
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Failed to download template");
+            toast.error(error instanceof Error ? error.message : "Failed to download template", { id: loadingToastId });
         } finally {
             setIsDownloadingTemplate(false);
         }
@@ -567,6 +588,7 @@ export default function TestDetailPage() {
 
     const handleUploadExcel = async (file: File | null) => {
         if (!file) return;
+        const loadingToastId = toast.loading("Uploading attempts from Excel...");
         try {
             setIsUploading(true);
             const formData = new FormData();
@@ -589,11 +611,11 @@ export default function TestDetailPage() {
                 throw new Error(message);
             }
 
-            toast.success(result?.message || "Attempts uploaded successfully");
+            toast.success(result?.message || "Attempts uploaded successfully", { id: loadingToastId });
             // Refresh attempts
             queryClient.invalidateQueries({ queryKey: ["test-attempts", testId] });
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Failed to upload attempts from Excel");
+            toast.error(error instanceof Error ? error.message : "Failed to upload attempts from Excel", { id: loadingToastId });
         } finally {
             setIsUploading(false);
         }
@@ -604,6 +626,7 @@ export default function TestDetailPage() {
             toast.error("Please enter a Google Sheets URL");
             return;
         }
+        const loadingToastId = toast.loading("Importing attempts from Google Sheets...");
         try {
             setIsImportingSheet(true);
             const response = await fetch(`/api/v1/tests/${testId}/import-google-sheet`, {
@@ -623,12 +646,12 @@ export default function TestDetailPage() {
                 throw new Error(message);
             }
 
-            toast.success(result?.message || "Attempts imported from Google Sheets successfully");
+            toast.success(result?.message || "Attempts imported from Google Sheets successfully", { id: loadingToastId });
             queryClient.invalidateQueries({ queryKey: ["test-attempts", testId] });
             setIsSheetDialogOpen(false);
             setSheetUrl("");
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Failed to import attempts from Google Sheets");
+            toast.error(error instanceof Error ? error.message : "Failed to import attempts from Google Sheets", { id: loadingToastId });
         } finally {
             setIsImportingSheet(false);
         }
@@ -703,6 +726,67 @@ export default function TestDetailPage() {
         });
     };
 
+    const handleQuestionDragStart = (questionId: string) => {
+        setDraggingQuestionId(questionId);
+    };
+
+    const handleQuestionDrop = (targetQuestionId: string) => {
+        if (!draggingQuestionId || draggingQuestionId === targetQuestionId) return;
+
+        setReorderDraftQuestions((prev) => {
+            const from = prev.findIndex((q) => q.id === draggingQuestionId);
+            const to = prev.findIndex((q) => q.id === targetQuestionId);
+            if (from === -1 || to === -1) return prev;
+
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            if (!moved) return prev;
+            next.splice(to, 0, moved);
+            return next;
+        });
+        setDraggingQuestionId(null);
+    };
+
+    const handleOpenReorderModal = () => {
+        setReorderDraftQuestions(testQuestions);
+        setDraggingQuestionId(null);
+        setIsReorderModalOpen(true);
+    };
+
+    const handleUpdateQuestionOrder = async () => {
+        if (!isQuestionOrderDirty) return;
+
+        const changed = reorderDraftQuestions
+            .map((item, index) => ({
+                id: item.id,
+                nextOrderIndex: index + 1,
+                currentOrderIndex: item.orderIndex,
+            }))
+            .filter((row) => row.nextOrderIndex !== row.currentOrderIndex);
+
+        if (changed.length === 0) return;
+
+        setIsUpdatingQuestionOrder(true);
+        const loadingToastId = toast.loading("Updating question order...");
+        try {
+            await reorderTestQuestions(testId, {
+                items: changed.map((row) => ({
+                    testQuestionId: row.id,
+                    orderIndex: row.nextOrderIndex,
+                })),
+            });
+            await queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
+            toast.dismiss(loadingToastId);
+            toast.success("Question order updated");
+            setIsReorderModalOpen(false);
+        } catch (error) {
+            toast.dismiss(loadingToastId);
+            toast.error(error instanceof Error ? error.message : "Failed to update question order");
+        } finally {
+            setIsUpdatingQuestionOrder(false);
+        }
+    };
+
     if (batchLoading || testLoading) {
         return (
             <div className="space-y-6">
@@ -749,9 +833,10 @@ export default function TestDetailPage() {
             allAttempts.reduce((sum, a) => sum + (a.totalScore || 0), 0) / allAttempts.length
         )
         : 0;
-    const highestPercentile = allAttempts.length > 0
-        ? Math.max(...allAttempts.map((a) => a.percentile || 0))
-        : 0;
+    const allPercentiles = allAttempts
+        .map((a) => a.percentile)
+        .filter((p): p is number => typeof p === "number");
+    const highestPercentile = allPercentiles.length > 0 ? Math.max(...allPercentiles) : null;
 
     // Get max marks for each subject
     const maxPhysics = test.totalMarksPhysics || 0;
@@ -996,8 +1081,8 @@ export default function TestDetailPage() {
                                                             ? "Added"
                                                             : addingQuestionIds.has(question.id) &&
                                                                 addQuestionMutation.isPending
-                                                              ? "Adding..."
-                                                              : "Add to Test"}
+                                                                ? "Adding..."
+                                                                : "Add to Test"}
                                                     </LoadingButton>
                                                 </div>
                                             </div>
@@ -1008,7 +1093,17 @@ export default function TestDetailPage() {
                         </div>
 
                         <div className="rounded-lg border border-border bg-card p-4 card-shadow space-y-4">
-                            <h2 className="text-sm font-bold text-foreground">Questions in This Test</h2>
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="text-sm font-bold text-foreground">Questions in This Test</h2>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={testQuestionsLoading || testQuestions.length < 2}
+                                    onClick={handleOpenReorderModal}
+                                >
+                                    Reorder Questions
+                                </Button>
+                            </div>
                             <div className="space-y-2 max-h-[560px] overflow-auto pr-1">
                                 {testQuestionsLoading ? (
                                     <p className="text-sm text-muted-foreground py-4">Loading test questions...</p>
@@ -1112,50 +1207,127 @@ export default function TestDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    <Dialog open={isReorderModalOpen} onOpenChange={setIsReorderModalOpen}>
+                        <DialogContent className="max-w-5xl">
+                            <DialogHeader>
+                                <DialogTitle>Reorder Questions</DialogTitle>
+                            </DialogHeader>
+                            <p className="text-sm text-muted-foreground">
+                                Drag and drop questions in any order, then click Update Order to save.
+                            </p>
+                            <div className="max-h-[65vh] overflow-y-auto space-y-2 pr-1">
+                                {reorderDraftQuestions.map((item, index) => (
+                                    <div
+                                        key={item.id}
+                                        className={cn(
+                                            "rounded-md border border-border p-3 bg-card",
+                                            draggingQuestionId === item.id ? "opacity-60" : ""
+                                        )}
+                                        draggable
+                                        onDragStart={() => handleQuestionDragStart(item.id)}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={() => handleQuestionDrop(item.id)}
+                                        onDragEnd={() => setDraggingQuestionId(null)}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex items-center gap-1 text-muted-foreground cursor-grab">
+                                                <GripVertical className="h-4 w-4" />
+                                                <span className="text-xs font-mono">{index + 1}</span>
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <p className="text-sm text-foreground">{truncateText(item.question.text, 200)}</p>
+                                                <div className="flex flex-wrap gap-2 text-xs">
+                                                    <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium">
+                                                        {item.question.subject}
+                                                    </span>
+                                                    <span className="rounded-full bg-muted px-2.5 py-1 text-foreground">
+                                                        {item.question.topicName ?? "No topic"}
+                                                    </span>
+                                                    <span className="rounded-full bg-muted px-2.5 py-1 text-foreground">
+                                                        Marks: {item.marks}, Negative: {item.negMarks}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsReorderModalOpen(false);
+                                        setDraggingQuestionId(null);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <LoadingButton
+                                    loading={isUpdatingQuestionOrder}
+                                    disabled={!isQuestionOrderDirty || isUpdatingQuestionOrder}
+                                    onClick={() => void handleUpdateQuestionOrder()}
+                                >
+                                    Update Order
+                                </LoadingButton>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             )}
 
             {activeTab === "results-analysis" && (
-                <div className="min-h-[360px] rounded-lg border border-dashed border-border bg-card flex flex-col items-center justify-center text-center p-6">
-                    <BarChart3 className="h-8 w-8 text-muted-foreground mb-3" />
-                    <p className="text-base font-medium text-foreground mb-1">Results & Analysis coming soon.</p>
-                    <p className="text-sm text-muted-foreground max-w-xl">
-                        Once marks are submitted, you&apos;ll see class performance overview and per-student question analysis here.
-                    </p>
+                <div className="space-y-5">
+                    {resultsAnalysisAttemptId ? (
+                        <TestAttemptQuestionAnalysis
+                            testId={testId}
+                            attemptId={resultsAnalysisAttemptId}
+                            onBack={() => router.replace(`/my-batches/${batchId}/test/${testId}?tab=results-analysis`)}
+                        />
+                    ) : (
+                        <TestClassOverview
+                            testId={testId}
+                            onViewAnalysis={(attemptId) =>
+                                router.push(
+                                    `/my-batches/${batchId}/test/${testId}?tab=results-analysis&analysisAttemptId=${attemptId}`,
+                                )
+                            }
+                        />
+                    )}
                 </div>
             )}
 
             {activeTab === "marks-entry" && (
                 <>
 
-            {/* Import & Bulk Upload section */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-bold text-foreground">
-                        Import & Bulk Upload Marks <span className="text-muted-foreground font-normal">(Excel / Google Sheets)</span>
-                    </h2>
-                    <Button
-                        onClick={() => setIsTemplateDialogOpen(true)}
-                        variant="outline"
-                        className="gap-2"
-                        disabled={!test || !batch || isDownloadingTemplate}
-                    >
-                        <Download className="h-4 w-4" />
-                        {isDownloadingTemplate ? "Downloading..." : "Download Template"}
-                    </Button>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="group rounded-lg border-2 border-dashed border-primary/40 bg-card p-5 hover:border-primary transition-all">
-                        <div className="flex items-start gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                                <Upload size={22} className="text-primary" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-foreground">Upload Excel</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    Upload either marks template or question-answer attempt template (.xls/.xlsx)
-                                </p>
-                                {/* <div className="mt-2 w-[220px]">
+                    {/* Import & Bulk Upload section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-bold text-foreground">
+                                Import & Bulk Upload Marks <span className="text-muted-foreground font-normal">(Excel / Google Sheets)</span>
+                            </h2>
+                            <Button
+                                onClick={() => setIsTemplateDialogOpen(true)}
+                                variant="outline"
+                                className="gap-2"
+                                disabled={!test || !batch || isDownloadingTemplate}
+                            >
+                                <Download className="h-4 w-4" />
+                                {isDownloadingTemplate ? "Downloading..." : "Download Template"}
+                            </Button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="group rounded-lg border-2 border-dashed border-primary/40 bg-card p-5 hover:border-primary transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                        <Upload size={22} className="text-primary" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-foreground">Upload Excel</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            Upload either marks template or question-answer attempt template (.xls/.xlsx)
+                                        </p>
+                                        {/* <div className="mt-2 w-[220px]">
                                     <Select
                                         value={uploadTemplateKind}
                                         onValueChange={(value: "auto" | "subject-marks" | "question-answers") =>
@@ -1172,550 +1344,546 @@ export default function TestDetailPage() {
                                         </SelectContent>
                                     </Select>
                                 </div> */}
-                                <div className="mt-3 flex items-center gap-2">
-                                    <label className="flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                                        <Upload size={14} />
-                                        {isUploading ? "Uploading..." : "Select Excel File"}
-                                        <input
-                                            type="file"
-                                            accept=".xls,.xlsx"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0] || null;
-                                                void handleUploadExcel(file);
-                                                // reset input so same file can be re-selected
-                                                e.target.value = "";
-                                            }}
-                                            disabled={isUploading}
-                                        />
-                                    </label>
+                                        <div className="mt-3 flex items-center gap-2">
+                                            <label className="flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+                                                <Upload size={14} />
+                                                {isUploading ? "Uploading..." : "Select Excel File"}
+                                                <input
+                                                    type="file"
+                                                    accept=".xls,.xlsx"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0] || null;
+                                                        void handleUploadExcel(file);
+                                                        // reset input so same file can be re-selected
+                                                        e.target.value = "";
+                                                    }}
+                                                    disabled={isUploading}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="group rounded-lg border-2 border-dashed border-primary/40 bg-card p-5 hover:border-primary transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
+                                        <FileSpreadsheet size={22} className="text-success" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-foreground">Import from Google Sheets</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">Import marks directly from Google Sheets</p>
+                                        <button
+                                            className="mt-3 flex items-center gap-2 rounded-md bg-jee px-4 py-2 text-xs font-semibold text-white hover:bg-jee/90 transition-colors"
+                                            onClick={() => setIsSheetDialogOpen(true)}
+                                        >
+                                            <FileSpreadsheet size={14} /> Connect Google Sheets
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="group rounded-lg border-2 border-dashed border-primary/40 bg-card p-5 hover:border-primary transition-all">
-                        <div className="flex items-start gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
-                                <FileSpreadsheet size={22} className="text-success" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-foreground">Import from Google Sheets</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">Import marks directly from Google Sheets</p>
-                                <button
-                                    className="mt-3 flex items-center gap-2 rounded-md bg-jee px-4 py-2 text-xs font-semibold text-white hover:bg-jee/90 transition-colors"
-                                    onClick={() => setIsSheetDialogOpen(true)}
-                                >
-                                    <FileSpreadsheet size={14} /> Connect Google Sheets
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {isSheetDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg border border-border">
-                        <h3 className="text-base font-semibold text-foreground mb-2">Import from Google Sheets</h3>
-                        <p className="text-xs text-muted-foreground mb-4">
-                            Paste the Google Sheets export URL (xlsx). Make sure the sheet is shared so it can be accessed without login.
-                        </p>
-                        <Input
-                            placeholder="https://docs.google.com/spreadsheets/d/.../export?format=xlsx"
-                            value={sheetUrl}
-                            onChange={(e) => setSheetUrl(e.target.value)}
-                            className="mb-4"
-                        />
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setIsSheetDialogOpen(false);
-                                    setSheetUrl("");
-                                }}
-                                disabled={isImportingSheet}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={() => void handleImportFromGoogleSheet()}
-                                disabled={isImportingSheet}
-                                className="gap-1"
-                            >
-                                {isImportingSheet ? (
-                                    <span>Importing...</span>
-                                ) : (
-                                    <>
-                                        <FileSpreadsheet size={14} />
-                                        <span>Import</span>
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {isTemplateDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg border border-border">
-                        <h3 className="text-base font-semibold text-foreground mb-2">Download Excel Template</h3>
-                        <p className="text-xs text-muted-foreground mb-4">
-                            Choose a template type, then decide whether to pre-fill students.
-                        </p>
-                        <div className="mb-4">
-                            <Select
-                                value={downloadTemplateType}
-                                onValueChange={(value: "subject-marks" | "question-answers") =>
-                                    setDownloadTemplateType(value)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select template type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="subject-marks">Marks Template (subject-wise)</SelectItem>
-                                    <SelectItem value="question-answers">Attempt Template (question-wise)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col sm:flex-row justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsTemplateDialogOpen(false)}
-                                disabled={isDownloadingTemplate}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void handleDownloadTemplate(false, downloadTemplateType)}
-                                disabled={isDownloadingTemplate}
-                            >
-                                Without Students
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => void handleDownloadTemplate(true, downloadTemplateType)}
-                                disabled={isDownloadingTemplate}
-                            >
-                                {isDownloadingTemplate ? (
-                                    <span>Preparing...</span>
-                                ) : (
-                                    <>
-                                        <Users size={14} />
-                                        <span>With Students + Roll No</span>
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Add Student & Bulk Actions Section */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                    <Select value={newStudentId} onValueChange={setNewStudentId}>
-                        <SelectTrigger className="w-[300px]">
-                            <SelectValue placeholder="Select a student to add" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {studentsLoading ? (
-                                <SelectItem value="loading" disabled>Loading...</SelectItem>
-                            ) : availableStudents.length === 0 ? (
-                                <SelectItem value="none" disabled>No students available</SelectItem>
-                            ) : (
-                                availableStudents.map((student: StudentInBatch) => (
-                                    <SelectItem key={student.id} value={student.id}>
-                                        {student.user.name} ({student.rollNo})
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handleAddStudent} className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add Student
-                    </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                className="gap-1"
-                                disabled={selectedAttemptIds.size === 0 || deleteAttemptsMutation.isPending}
-                                onClick={handleDeleteSelectedAttempts}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="hidden sm:inline">Delete Selected</span>
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Delete selected attempts?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the selected attempts and
-                                    remove their marks from this test.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel
-                                    onClick={() => {
-                                        setIsDeleteDialogOpen(false);
-                                    }}
-                                >
-                                    Cancel
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                    variant="destructive"
-                                    onClick={() => {
-                                        deleteAttemptsMutation.mutate(Array.from(selectedAttemptIds));
-                                        setIsDeleteDialogOpen(false);
-                                    }}
-                                >
-                                    Delete
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto rounded-lg border border-border bg-card card-shadow">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-border bg-muted/50">
-                            <th className="w-8 px-3 py-3">
-                                <Checkbox
-                                    className="rounded border-border"
-                                    checked={
-                                        allAttempts.length > 0 &&
-                                        allAttempts
-                                            .filter((a) => a.id)
-                                            .every((a) => selectedAttemptIds.has(a.id as string))
-                                    }
-                                    onCheckedChange={handleToggleSelectAll}
+                    {isSheetDialogOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                            <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg border border-border">
+                                <h3 className="text-base font-semibold text-foreground mb-2">Import from Google Sheets</h3>
+                                <p className="text-xs text-muted-foreground mb-4">
+                                    Paste the Google Sheets export URL (xlsx). Make sure the sheet is shared so it can be accessed without login.
+                                </p>
+                                <Input
+                                    placeholder="https://docs.google.com/spreadsheets/d/.../export?format=xlsx"
+                                    value={sheetUrl}
+                                    onChange={(e) => setSheetUrl(e.target.value)}
+                                    className="mb-4"
                                 />
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-foreground">Student Name</th>
-                            {isJEE ? (
-                                <>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Physics <span className="text-xs text-muted-foreground font-normal">({maxPhysics})</span>
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Chemistry <span className="text-xs text-muted-foreground font-normal">({maxChemistry})</span>
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Mathematics <span className="text-xs text-muted-foreground font-normal">({maxMathematics})</span>
-                                    </th>
-                                </>
-                            ) : (
-                                <>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Physics <span className="text-xs text-muted-foreground font-normal">({maxPhysics})</span>
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Chemistry <span className="text-xs text-muted-foreground font-normal">({maxChemistry})</span>
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Zoology <span className="text-xs text-muted-foreground font-normal">({maxZoology})</span>
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                        Botany <span className="text-xs text-muted-foreground font-normal">({maxBotany})</span>
-                                    </th>
-                                </>
-                            )}
-                            <th className="px-4 py-3 text-center font-semibold text-foreground">
-                                Total Marks <span className="text-xs text-muted-foreground font-normal">({test.totalMarks})</span>
-                            </th>
-                            <th className="px-4 py-3 text-center font-semibold text-foreground">Percentile</th>
-                            <th className="px-4 py-3 text-center font-semibold text-foreground">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {attemptsLoading ? (
-                            <tr>
-                                <td colSpan={isJEE ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">
-                                    Loading attempts...
-                                </td>
-                            </tr>
-                        ) : allAttempts.length === 0 ? (
-                            <tr>
-                                <td colSpan={isJEE ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">
-                                    No attempts found for this test. Add a student to get started.
-                                </td>
-                            </tr>
-                        ) : (
-                            allAttempts.map((attempt, i) => {
-                                const total = attempt.totalScore || 0;
-                                const percentile =
-                                    test.totalMarks && total > 0 ? (total / test.totalMarks) * 100 : 0;
-                                const studentName = attempt.student?.user.name || "Unknown";
-                                const avatar = studentName.charAt(0).toUpperCase();
-                                const rollNo = attempt.student?.rollNo || "";
-                                const isEditing = editingAttempts.has(attempt.studentId);
-                                const hasUnsavedChanges = !!editingAttempts.get(attempt.studentId);
-
-                                return (
-                                    <tr
-                                        key={attempt.id || attempt.studentId}
-                                        className={cn(
-                                            "border-b border-border last:border-0 hover:bg-muted/30 transition-colors",
-                                            i % 2 === 0 ? "bg-card" : "bg-muted/20",
-                                            isEditing && "bg-primary/5"
-                                        )}
+                                <div className="flex justify-end gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsSheetDialogOpen(false);
+                                            setSheetUrl("");
+                                        }}
+                                        disabled={isImportingSheet}
                                     >
-                                        <td className="px-3 py-3">
-                                            <Checkbox
-                                                className="rounded border-border"
-                                                disabled={!attempt.id}
-                                                checked={attempt.id ? selectedAttemptIds.has(attempt.id) : false}
-                                                onCheckedChange={() => handleToggleSelectAttempt(attempt.id)}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                                    {avatar}
-                                                </div>
-                                                <div>
-                                                    <span className="font-medium text-foreground">{studentName}</span>
-                                                    <p className="text-xs text-muted-foreground">Roll No: {rollNo}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        {isJEE ? (
-                                            <>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.physicsMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "physicsMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxPhysics,
-                                                                "Physics"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxPhysics}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.chemistryMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "chemistryMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxChemistry,
-                                                                "Chemistry"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxChemistry}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.mathematicsMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "mathematicsMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxMathematics,
-                                                                "Mathematics"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxMathematics}
-                                                    />
-                                                </td>
-                                            </>
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => void handleImportFromGoogleSheet()}
+                                        disabled={isImportingSheet}
+                                        className="gap-1"
+                                    >
+                                        {isImportingSheet ? (
+                                            <span>Importing...</span>
                                         ) : (
                                             <>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.physicsMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "physicsMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxPhysics,
-                                                                "Physics"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxPhysics}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.chemistryMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "chemistryMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxChemistry,
-                                                                "Chemistry"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxChemistry}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.zoologyMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "zoologyMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxZoology,
-                                                                "Zoology"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxZoology}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Input
-                                                        type="number"
-                                                        value={attempt.botanyMarks?.toString() || ""}
-                                                        onChange={(e) =>
-                                                            handleUpdateMarks(
-                                                                attempt.studentId,
-                                                                "botanyMarks",
-                                                                e.target.value ? parseFloat(e.target.value) : null,
-                                                                maxBotany,
-                                                                "Botany"
-                                                            )
-                                                        }
-                                                        className="w-20 text-center font-mono"
-                                                        placeholder="0"
-                                                        min={0}
-                                                        max={maxBotany}
-                                                    />
-                                                </td>
+                                                <FileSpreadsheet size={14} />
+                                                <span>Import</span>
                                             </>
                                         )}
-                                        <td className="px-4 py-3 text-center font-mono font-semibold text-foreground">
-                                            {total.toFixed(1)} <span className="text-muted-foreground font-normal">/ {test.totalMarks}</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {percentile > 0 ? (
-                                                <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono", getPercentileBg(percentile))}>
-                                                    {percentile.toFixed(1)}%
-                                                </span>
-                                            ) : (
-                                                <span className="text-muted-foreground text-xs">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center justify-center gap-1.5">
-                                                <LoadingButton
-                                                    size="sm"
-                                                    onClick={() => handleSave(attempt.studentId)}
-                                                    loading={savingStudentId === attempt.studentId && saveMutation.isPending}
-                                                    disabled={!hasUnsavedChanges}
-                                                    className="h-8 text-xs"
-                                                >
-                                                    <Save size={12} className="mr-1" />
-                                                    Save
-                                                </LoadingButton>
-                                                {isEditing && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleCancel(attempt.studentId)}
-                                                        className="h-8 w-8 p-0"
-                                                    >
-                                                        <X size={12} />
-                                                    </Button>
-                                                )}
-                                                <button
-                                                    className={cn(
-                                                        "inline-flex items-center justify-center rounded-full p-1.5",
-                                                        attempt.isNotified
-                                                            ? "bg-muted text-muted-foreground cursor-default"
-                                                            : "bg-emerald-600 text-white hover:bg-emerald-700"
-                                                    )}
-                                                    title={
-                                                        attempt.isNotified
-                                                            ? "Result already notified"
-                                                            : "Notify parent via WhatsApp"
-                                                    }
-                                                    disabled={attempt.isNotified || notifyMutation.isPending}
-                                                    onClick={() => void handleNotifyParent(attempt as TestAttemptListItem)}
-                                                >
-                                                    {notifyingAttemptId === attempt.id && notifyMutation.isPending ? (
-                                                        <span className="text-[10px] font-semibold px-1">...</span>
-                                                    ) : (
-                                                        <MessageCircle size={14} />
-                                                    )}
-                                                </button>
-                                            </div>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {isTemplateDialogOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                            <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg border border-border">
+                                <h3 className="text-base font-semibold text-foreground mb-2">Download Excel Template</h3>
+                                <p className="text-xs text-muted-foreground mb-4">
+                                    Choose a template type, then decide whether to pre-fill students.
+                                </p>
+                                <div className="mb-4">
+                                    <Select
+                                        value={downloadTemplateType}
+                                        onValueChange={(value: "subject-marks" | "question-answers") =>
+                                            setDownloadTemplateType(value)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select template type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="subject-marks">Subject Wise Marks Template</SelectItem>
+                                            <SelectItem value="question-answers">Question Wise Answer Template</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex flex-col sm:flex-row justify-end gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsTemplateDialogOpen(false)}
+                                        disabled={isDownloadingTemplate}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void handleDownloadTemplate(false, downloadTemplateType)}
+                                        disabled={isDownloadingTemplate}
+                                    >
+                                        Without Students
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="gap-1"
+                                        onClick={() => void handleDownloadTemplate(true, downloadTemplateType)}
+                                        disabled={isDownloadingTemplate}
+                                    >
+                                        {isDownloadingTemplate ? (
+                                            <span>Preparing...</span>
+                                        ) : (
+                                            <>
+                                                <Users size={14} />
+                                                <span>With Students + Roll No</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Student & Bulk Actions Section */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <Select value={newStudentId} onValueChange={setNewStudentId}>
+                                <SelectTrigger className="w-[300px]">
+                                    <SelectValue placeholder="Select a student to add" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {studentsLoading ? (
+                                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                                    ) : availableStudents.length === 0 ? (
+                                        <SelectItem value="none" disabled>No students available</SelectItem>
+                                    ) : (
+                                        availableStudents.map((student: StudentInBatch) => (
+                                            <SelectItem key={student.id} value={student.id}>
+                                                {student.user.name} ({student.rollNo})
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <Button onClick={handleAddStudent} className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                Add Student
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        className="gap-1"
+                                        disabled={selectedAttemptIds.size === 0 || deleteAttemptsMutation.isPending}
+                                        onClick={handleDeleteSelectedAttempts}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Delete Selected</span>
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete selected attempts?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the selected attempts and
+                                            remove their marks from this test.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel
+                                            onClick={() => {
+                                                setIsDeleteDialogOpen(false);
+                                            }}
+                                        >
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            variant="destructive"
+                                            onClick={() => {
+                                                deleteAttemptsMutation.mutate(Array.from(selectedAttemptIds));
+                                                setIsDeleteDialogOpen(false);
+                                            }}
+                                        >
+                                            Delete
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto rounded-lg border border-border bg-card card-shadow">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-border bg-muted/50">
+                                    <th className="w-8 px-3 py-3">
+                                        <Checkbox
+                                            className="rounded border-border"
+                                            checked={
+                                                allAttempts.length > 0 &&
+                                                allAttempts
+                                                    .filter((a) => a.id)
+                                                    .every((a) => selectedAttemptIds.has(a.id as string))
+                                            }
+                                            onCheckedChange={handleToggleSelectAll}
+                                        />
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-semibold text-foreground">Student Name</th>
+                                    {isJEE ? (
+                                        <>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Physics <span className="text-xs text-muted-foreground font-normal">({maxPhysics})</span>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Chemistry <span className="text-xs text-muted-foreground font-normal">({maxChemistry})</span>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Mathematics <span className="text-xs text-muted-foreground font-normal">({maxMathematics})</span>
+                                            </th>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Physics <span className="text-xs text-muted-foreground font-normal">({maxPhysics})</span>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Chemistry <span className="text-xs text-muted-foreground font-normal">({maxChemistry})</span>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Zoology <span className="text-xs text-muted-foreground font-normal">({maxZoology})</span>
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                                Botany <span className="text-xs text-muted-foreground font-normal">({maxBotany})</span>
+                                            </th>
+                                        </>
+                                    )}
+                                    <th className="px-4 py-3 text-center font-semibold text-foreground">
+                                        Total Marks <span className="text-xs text-muted-foreground font-normal">({test.totalMarks})</span>
+                                    </th>
+                                    <th className="px-4 py-3 text-center font-semibold text-foreground">Percentile</th>
+                                    <th className="px-4 py-3 text-center font-semibold text-foreground">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {attemptsLoading ? (
+                                    <tr>
+                                        <td colSpan={isJEE ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">
+                                            Loading attempts...
                                         </td>
                                     </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                ) : allAttempts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={isJEE ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">
+                                            No attempts found for this test. Add a student to get started.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    allAttempts.map((attempt, i) => {
+                                        const total = attempt.totalScore || 0;
+                                        const percentile = test.totalMarks > 0 ? (total / test.totalMarks) * 100 : null;
+                                        const studentName = attempt.student?.user.name || "Unknown";
+                                        const avatar = studentName.charAt(0).toUpperCase();
+                                        const rollNo = attempt.student?.rollNo || "";
+                                        const isEditing = editingAttempts.has(attempt.studentId);
+                                        const hasUnsavedChanges = !!editingAttempts.get(attempt.studentId);
 
-            {/* Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 card-shadow">
-                <div className="flex flex-wrap gap-6">
-                    <Stat icon={Users} label="Students:" value={totalStudents.toString()} />
-                    <Stat icon={TrendingUp} label="Avg. Marks:" value={`${avgTotal} / ${test.totalMarks}`} />
-                    <Stat icon={Award} label="Highest Percentile:" value={highestPercentile > 0 ? `${highestPercentile.toFixed(1)}%` : "-"} />
-                    <Stat icon={BellRing} label="Submitted:" value={`${submittedAttempts.length} / ${totalStudents}`} />
-                </div>
-                {/* <button className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                                        return (
+                                            <tr
+                                                key={attempt.id || attempt.studentId}
+                                                className={cn(
+                                                    "border-b border-border last:border-0 hover:bg-muted/30 transition-colors",
+                                                    i % 2 === 0 ? "bg-card" : "bg-muted/20",
+                                                    isEditing && "bg-primary/5"
+                                                )}
+                                            >
+                                                <td className="px-3 py-3">
+                                                    <Checkbox
+                                                        className="rounded border-border"
+                                                        disabled={!attempt.id}
+                                                        checked={attempt.id ? selectedAttemptIds.has(attempt.id) : false}
+                                                        onCheckedChange={() => handleToggleSelectAttempt(attempt.id)}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                                            {avatar}
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-medium text-foreground">{studentName}</span>
+                                                            <p className="text-xs text-muted-foreground">Roll No: {rollNo}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {isJEE ? (
+                                                    <>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.physicsMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "physicsMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxPhysics,
+                                                                        "Physics"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxPhysics}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.chemistryMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "chemistryMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxChemistry,
+                                                                        "Chemistry"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxChemistry}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.mathematicsMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "mathematicsMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxMathematics,
+                                                                        "Mathematics"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxMathematics}
+                                                            />
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.physicsMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "physicsMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxPhysics,
+                                                                        "Physics"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxPhysics}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.chemistryMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "chemistryMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxChemistry,
+                                                                        "Chemistry"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxChemistry}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.zoologyMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "zoologyMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxZoology,
+                                                                        "Zoology"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxZoology}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={attempt.botanyMarks?.toString() || ""}
+                                                                onChange={(e) =>
+                                                                    handleUpdateMarks(
+                                                                        attempt.studentId,
+                                                                        "botanyMarks",
+                                                                        e.target.value ? parseFloat(e.target.value) : null,
+                                                                        maxBotany,
+                                                                        "Botany"
+                                                                    )
+                                                                }
+                                                                className="w-20 text-center font-mono"
+                                                                placeholder="0"
+                                                                max={maxBotany}
+                                                            />
+                                                        </td>
+                                                    </>
+                                                )}
+                                                <td className="px-4 py-3 text-center font-mono font-semibold text-foreground">
+                                                    {total.toFixed(1)} <span className="text-muted-foreground font-normal">/ {test.totalMarks}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {percentile !== null ? (
+                                                        <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono", getPercentileBg(percentile))}>
+                                                            {percentile.toFixed(1)}%
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-xs">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <LoadingButton
+                                                            size="sm"
+                                                            onClick={() => handleSave(attempt.studentId)}
+                                                            loading={savingStudentId === attempt.studentId && saveMutation.isPending}
+                                                            disabled={!hasUnsavedChanges}
+                                                            className="h-8 text-xs"
+                                                        >
+                                                            <Save size={12} className="mr-1" />
+                                                            Save
+                                                        </LoadingButton>
+                                                        {isEditing && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleCancel(attempt.studentId)}
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <X size={12} />
+                                                            </Button>
+                                                        )}
+                                                        <button
+                                                            className={cn(
+                                                                "inline-flex items-center justify-center rounded-full p-1.5",
+                                                                attempt.isNotified
+                                                                    ? "bg-muted text-muted-foreground cursor-default"
+                                                                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                                            )}
+                                                            title={
+                                                                attempt.isNotified
+                                                                    ? "Result already notified"
+                                                                    : "Notify parent via WhatsApp"
+                                                            }
+                                                            disabled={attempt.isNotified || notifyMutation.isPending}
+                                                            onClick={() => void handleNotifyParent(attempt as TestAttemptListItem)}
+                                                        >
+                                                            {notifyingAttemptId === attempt.id && notifyMutation.isPending ? (
+                                                                <span className="text-[10px] font-semibold px-1">...</span>
+                                                            ) : (
+                                                                <MessageCircle size={14} />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 card-shadow">
+                        <div className="flex flex-wrap gap-6">
+                            <Stat icon={Users} label="Students:" value={totalStudents.toString()} />
+                            <Stat icon={TrendingUp} label="Avg. Marks:" value={`${avgTotal} / ${test.totalMarks}`} />
+                            <Stat
+                                icon={Award}
+                                label="Highest Percentile:"
+                                value={highestPercentile === null ? "-" : `${highestPercentile.toFixed(1)}%`}
+                            />
+                            <Stat icon={BellRing} label="Submitted:" value={`${submittedAttempts.length} / ${totalStudents}`} />
+                        </div>
+                        {/* <button className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
                     <Save size={16} />
                     Save Marks & Generate Report
                 </button> */}
-            </div>
+                    </div>
 
-            <p className="text-xs text-center text-muted-foreground">
-                Marks will be auto-saved and reflected in student dashboards, results & parent app.
-            </p>
+                    <p className="text-xs text-center text-muted-foreground">
+                        Marks will be auto-saved and reflected in student dashboards, results & parent app.
+                    </p>
                 </>
             )}
         </div>

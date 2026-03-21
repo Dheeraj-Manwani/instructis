@@ -144,6 +144,8 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
                 select: {
                     questionId: true,
                     orderIndex: true,
+                    marks: true,
+                    negMarks: true,
                     question: {
                         select: {
                             id: true,
@@ -179,7 +181,8 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
                     : "";
 
             row.getCell(1).value = index + 1;
-            row.getCell(2).value = q.questionId;
+            // "Question ID" column is used as test question order index in templates.
+            row.getCell(2).value = q.orderIndex;
             row.getCell(3).value = q.question.subject;
             row.getCell(4).value = q.question.topic?.name ?? "";
             row.getCell(5).value = q.question.difficulty;
@@ -189,7 +192,12 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
             row.getCell(9).value = optionByIndex(3);
             row.getCell(10).value = optionByIndex(4);
             row.getCell(11).value = correctOptionKey;
+            row.getCell(12).value = q.marks;
+            row.getCell(13).value = -Math.abs(q.negMarks);
         });
+
+        // Ensure reference sheet has explicit negative marks column header.
+        referenceSheet.getRow(3).getCell(13).value = "Negative Marks";
 
         // Fill Sheet 1 (Question Answers), rows 6-2005 max = 2000 rows
         // Each row is student x question pair.
@@ -206,7 +214,8 @@ export const GET = catchAsync(async (req: NextRequest, { params }) => {
                     row.getCell(1).value = serial;
                     row.getCell(2).value = student.rollNo;
                     row.getCell(3).value = student.user.name;
-                    row.getCell(4).value = q.questionId;
+                    // "Question ID" column is used as test question order index in templates.
+                    row.getCell(4).value = q.orderIndex;
                     // Column E is Selected Option, intentionally left blank
                     serial += 1;
                     currentRowIndex += 1;

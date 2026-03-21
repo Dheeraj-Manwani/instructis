@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { NotFoundError, ValidationError } from "@/lib/utils/errors";
-import { ExamType } from "@prisma/client";
+import { ExamType, Prisma } from "@prisma/client";
+import chalk from "chalk";
 
 export type MockTestListItem = {
     id: string;
@@ -231,38 +232,83 @@ export async function addQuestionToTest(
         );
     }
 
-    const maxOrder = await prisma.mockTestQuestion.aggregate({
-        where: { mockTestId: testId },
-        _max: { orderIndex: true },
-    });
-    const nextOrder = (maxOrder._max.orderIndex ?? 0) + 1;
-
-    const created = await prisma.mockTestQuestion.create({
-        data: {
-            mockTestId: testId,
-            questionId,
-            marks,
-            negMarks,
-            orderIndex: nextOrder,
-        },
-        include: {
-            question: {
-                select: {
-                    id: true,
-                    text: true,
-                    difficulty: true,
-                    subject: true,
-                    topic: {
-                        select: {
-                            name: true,
-                        },
+    const includeQuestion = {
+        question: {
+            select: {
+                id: true,
+                text: true,
+                difficulty: true,
+                subject: true,
+                topic: {
+                    select: {
+                        name: true,
                     },
                 },
             },
         },
-    });
+    } as const;
 
-    return mapTestQuestion(created);
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+        const retryNumber = attempt + 1;
+        const maxOrder = await prisma.mockTestQuestion.aggregate({
+            where: { mockTestId: testId },
+            _max: { orderIndex: true },
+        });
+        const nextOrder = (maxOrder._max.orderIndex ?? 0) + 1;
+
+        try {
+            const created = await prisma.mockTestQuestion.create({
+                data: {
+                    mockTestId: testId,
+                    questionId,
+                    marks,
+                    negMarks,
+                    orderIndex: nextOrder,
+                },
+                include: includeQuestion,
+            });
+            return mapTestQuestion(created);
+        } catch (error) {
+            const isUniqueConflict =
+                error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+            if (!isUniqueConflict) {
+                throw error;
+            }
+
+            // Colorful retry visibility for concurrent add collisions.
+            console.log(
+                chalk.yellow(
+                    `[addQuestionToTest] Unique conflict on retry ${retryNumber}/${maxRetries} for test ${testId}`
+                )
+            );
+
+            // If another concurrent request already added this question, return that row.
+            const concurrentExisting = await prisma.mockTestQuestion.findFirst({
+                where: { mockTestId: testId, questionId },
+                include: includeQuestion,
+            });
+            if (concurrentExisting) {
+                console.log(
+                    chalk.cyan(
+                        `[addQuestionToTest] Recovered on retry ${retryNumber}/${maxRetries}; question already added concurrently.`
+                    )
+                );
+                return mapTestQuestion(concurrentExisting);
+            }
+
+            if (attempt === maxRetries - 1) {
+                console.log(
+                    chalk.red(
+                        `[addQuestionToTest] Exhausted retries (${retryNumber}/${maxRetries}) for test ${testId}.`
+                    )
+                );
+                throw new ValidationError("Could not add question due to concurrent updates. Please retry.");
+            }
+        }
+    }
+
+    throw new ValidationError("Could not add question due to concurrent updates. Please retry.");
 }
 
 export async function updateTestQuestion(
@@ -313,6 +359,44 @@ export async function removeQuestionFromTest(testId: string, testQuestionId: str
     await prisma.mockTestQuestion.delete({
         where: { id: testQuestionId },
     });
+}
+
+export async function reorderTestQuestions(
+    testId: string,
+    items: Array<{ testQuestionId: string; orderIndex: number }>
+): Promise<TestQuestionListItem[]> {
+    const uniqueQuestionIds = new Set(items.map((item) => item.testQuestionId));
+    if (uniqueQuestionIds.size !== items.length) {
+        throw new ValidationError("Duplicate test question IDs in reorder payload");
+    }
+
+    const uniqueOrderIndexes = new Set(items.map((item) => item.orderIndex));
+    if (uniqueOrderIndexes.size !== items.length) {
+        throw new ValidationError("Duplicate order indexes in reorder payload");
+    }
+
+    const existingRows = await prisma.mockTestQuestion.findMany({
+        where: {
+            mockTestId: testId,
+            id: { in: [...uniqueQuestionIds] },
+        },
+        select: { id: true },
+    });
+
+    if (existingRows.length !== items.length) {
+        throw new NotFoundError("One or more test questions were not found in this test");
+    }
+
+    await prisma.$transaction(
+        items.map((item) =>
+            prisma.mockTestQuestion.update({
+                where: { id: item.testQuestionId },
+                data: { orderIndex: item.orderIndex },
+            })
+        )
+    );
+
+    return findTestQuestionsByTestId(testId);
 }
 
 export type TestAttemptListItem = {
@@ -495,9 +579,13 @@ export type CreateTestAttemptInput = {
     submittedAt?: Date | null;
 };
 
-export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): Promise<TestAttemptListItem> {
+export async function createOrUpdateTestAttempt(
+    data: CreateTestAttemptInput,
+    tx?: Prisma.TransactionClient
+): Promise<TestAttemptListItem> {
+    const db = tx ?? prisma;
     // Check if attempt already exists
-    const existing = await prisma.testAttempt.findFirst({
+    const existing = await db.testAttempt.findFirst({
         where: {
             studentId: data.studentId,
             mockTestId: data.mockTestId,
@@ -506,7 +594,7 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
 
     if (existing) {
         // Update existing attempt
-        const attempt = await prisma.testAttempt.update({
+        const attempt = await db.testAttempt.update({
             where: { id: existing.id },
             data: {
                 physicsMarks: data.physicsMarks,
@@ -556,7 +644,7 @@ export async function createOrUpdateTestAttempt(data: CreateTestAttemptInput): P
         };
     } else {
         // Create new attempt
-        const attempt = await prisma.testAttempt.create({
+        const attempt = await db.testAttempt.create({
             data: {
                 studentId: data.studentId,
                 mockTestId: data.mockTestId,
@@ -637,7 +725,8 @@ export async function getTestAttemptWithStudentAndTestOrThrow(attemptId: string)
 export async function markTestAttemptNotified(attemptId: string): Promise<TestAttemptListItem> {
     const attempt = await prisma.testAttempt.update({
         where: { id: attemptId },
-        data: { isNotified: true },
+        // TODO: reset the notified flag to true
+        data: { isNotified: false },
         include: {
             student: {
                 include: {
@@ -677,14 +766,35 @@ export async function markTestAttemptNotified(attemptId: string): Promise<TestAt
 }
 
 export async function deleteTestAttemptsByIds(testId: string, attemptIds: string[]): Promise<number> {
-    const result = await prisma.testAttempt.deleteMany({
+    const targetAttempts = await prisma.testAttempt.findMany({
         where: {
-            id: {
-                in: attemptIds,
-            },
+            id: { in: attemptIds },
             mockTestId: testId,
         },
+        select: { id: true },
     });
+
+    if (targetAttempts.length === 0) {
+        return 0;
+    }
+
+    const targetAttemptIds = targetAttempts.map((a) => a.id);
+
+    const [, result] = await prisma.$transaction([
+        prisma.studentAnswer.deleteMany({
+            where: {
+                attemptId: { in: targetAttemptIds },
+            },
+        }),
+        prisma.testAttempt.deleteMany({
+            where: {
+                id: {
+                    in: targetAttemptIds,
+                },
+                mockTestId: testId,
+            },
+        }),
+    ]);
 
     return result.count;
 }

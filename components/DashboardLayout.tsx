@@ -59,6 +59,7 @@ const allNavItems: NavItem[] = [
 
   // existing student items
   { title: "My Tests", path: "/my-tests", icon: FileText, roles: [RoleEnum.STUDENT] },
+  { title: "AI Rank Predictor", path: "/ai-rank-predictor", icon: Brain, roles: [RoleEnum.STUDENT] },
 
   // existing admin items
   { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
@@ -80,6 +81,8 @@ const pageTitles: Record<string, string> = {
 
   // student pages
   "/my-tests": "My Tests",
+  "/ai-rank-predictor": "AI Rank Predictor",
+  "/practice": "Practice",
 
   // admin pages
   "/batches": "Batches",

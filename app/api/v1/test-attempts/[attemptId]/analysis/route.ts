@@ -8,7 +8,7 @@ import { ForbiddenError, NotFoundError } from "@/lib/utils/errors";
 
 export const GET = catchAsync(async (req, { params }) => {
     const session = await withAuth(req);
-    withRole(session, "STUDENT");
+    withRole(session, "STUDENT", "FACULTY", "ADMIN");
 
     const attemptId = z.string().min(1).parse((await params)?.attemptId);
 
@@ -30,6 +30,7 @@ export const GET = catchAsync(async (req, { params }) => {
                     name: true,
                     duration: true,
                     totalMarks: true,
+                    facultyId: true,
                     batch: {
                         select: {
                             id: true,
@@ -46,9 +47,23 @@ export const GET = catchAsync(async (req, { params }) => {
         throw new NotFoundError("Test attempt not found");
     }
 
-    // Students should only access their own attempt analysis
-    if (attempt.student.user.id !== session.user.id) {
-        throw new ForbiddenError("You do not have permission to view this analysis");
+    if (session.user.role === "STUDENT") {
+        // Students should only access their own attempt analysis
+        if (attempt.student.user.id !== session.user.id) {
+            throw new ForbiddenError("You do not have permission to view this analysis");
+        }
+    } else {
+        // Faculty/Admin access: ensure faculty owns the test (or allow admin)
+        if (session.user.role !== "ADMIN") {
+            const faculty = await prisma.faculty.findUnique({
+                where: { userId: session.user.id },
+                select: { id: true },
+            });
+
+            if (!faculty || faculty.id !== attempt.mockTest.facultyId) {
+                throw new ForbiddenError("You do not have permission to view this analysis");
+            }
+        }
     }
 
     const [mockQuestions, studentAnswers] = await Promise.all([
@@ -99,6 +114,15 @@ export const GET = catchAsync(async (req, { params }) => {
         }
         return "Not Answered";
     };
+    const optionLabelFor = (
+        optionId: string | null,
+        questionOptions: { id: string; orderIndex: number }[],
+    ): string | null => {
+        if (!optionId) return null;
+        const selected = questionOptions.find((o) => o.id === optionId);
+        if (!selected) return null;
+        return String.fromCharCode(64 + selected.orderIndex);
+    };
 
     const questions = studentAnswers
         .map((a) => {
@@ -113,6 +137,15 @@ export const GET = catchAsync(async (req, { params }) => {
                 { selectedOptionId: a.selectedOptionId, numericalAnswer: a.numericalAnswer },
                 question.options.map((o) => ({ id: o.id, text: o.text })),
             );
+            const yourOptionLabel = optionLabelFor(
+                a.selectedOptionId,
+                question.options.map((o) => ({ id: o.id, orderIndex: o.orderIndex })),
+            );
+            const correctOptionId = question.options.find((o) => o.isCorrect)?.id ?? null;
+            const correctOptionLabel = optionLabelFor(
+                correctOptionId,
+                question.options.map((o) => ({ id: o.id, orderIndex: o.orderIndex })),
+            );
 
             const isCorrect =
                 a.isCorrect ??
@@ -126,7 +159,9 @@ export const GET = catchAsync(async (req, { params }) => {
                 questionText: question.text,
                 explanation: question.explanation,
                 yourAnswer,
+                yourOptionLabel,
                 correctAnswer,
+                correctOptionLabel,
                 isCorrect,
                 marksAwarded: a.marksAwarded,
             };
@@ -139,6 +174,7 @@ export const GET = catchAsync(async (req, { params }) => {
             submittedAt: attempt.submittedAt,
             totalScore: attempt.totalScore,
             percentile: attempt.percentile,
+            timeTaken: attempt.timeTaken,
         },
         batch: attempt.mockTest.batch,
         test: {

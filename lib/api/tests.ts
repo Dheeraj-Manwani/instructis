@@ -119,7 +119,9 @@ export async function createTestAttempt(testId: string, payload: CreateTestAttem
 }
 
 export async function notifyTestAttempt(testId: string, attemptId: string): Promise<TestAttemptListItem> {
-    const res = (await api.post(`/tests/${testId}/attempts/${attemptId}/notify`)) as {
+    const res = (await api.post(`/tests/${testId}/attempts/${attemptId}/notify`, undefined, {
+        timeout: 60000,
+    })) as {
         data: TestAttemptListItem;
     };
     return res.data;
@@ -193,6 +195,23 @@ export async function removeTestQuestion(testId: string, testQuestionId: string)
     await api.delete(`/tests/${testId}/questions/${testQuestionId}`);
 }
 
+export type ReorderTestQuestionsPayload = {
+    items: Array<{
+        testQuestionId: string;
+        orderIndex: number;
+    }>;
+};
+
+export async function reorderTestQuestions(
+    testId: string,
+    payload: ReorderTestQuestionsPayload
+): Promise<TestQuestionListItem[]> {
+    const res = (await api.patch(`/tests/${testId}/questions/reorder`, payload)) as {
+        data: TestQuestionListItem[];
+    };
+    return res.data ?? [];
+}
+
 export type MyTestsBatch = {
     id: string;
     name: string;
@@ -236,7 +255,9 @@ export type TestAttemptAnalysisQuestion = {
     questionText: string;
     explanation: string | null;
     yourAnswer: string;
+    yourOptionLabel: string | null;
     correctAnswer: string;
+    correctOptionLabel: string | null;
     isCorrect: boolean;
     marksAwarded: number | null;
 };
@@ -247,6 +268,7 @@ export type TestAttemptAnalysisResponse = {
         submittedAt: string | null;
         totalScore: number | null;
         percentile: number | null;
+        timeTaken: number | null;
     };
     batch: null | { id: string; name: string; examType: ExamType };
     test: {
@@ -265,5 +287,51 @@ export async function fetchTestAttemptAnalysis(
     const res = (await api.get(`/test-attempts/${attemptId}/analysis`)) as {
         data: TestAttemptAnalysisResponse;
     };
+    return res.data;
+}
+
+export type TestClassOverviewResponse = {
+    test: {
+        id: string;
+        name: string;
+        totalMarks: number;
+        totalMarksPhysics: number | null;
+        totalMarksChemistry: number | null;
+        totalMarksMathematics: number | null;
+        totalMarksZoology: number | null;
+        totalMarksBotany: number | null;
+    };
+    batch: {
+        id: string;
+        name: string;
+        examType: ExamType;
+    };
+    stats: {
+        totalStudentsAttempted: number;
+        classAveragePercentile: number | null;
+        highestPercentile: number | null;
+    };
+    students: Array<{
+        studentId: string;
+        name: string;
+        rollNo: string;
+        avatarInitial: string;
+        attemptId: string | null;
+        pending: boolean;
+        physicsMarks: number | null;
+        chemistryMarks: number | null;
+        mathematicsMarks: number | null;
+        zoologyMarks: number | null;
+        botanyMarks: number | null;
+        totalScore: number | null;
+        percentile: number | null;
+        timeTaken: number | null;
+        improvementPoints: number | null;
+        rank: number | null;
+    }>;
+};
+
+export async function fetchTestClassOverview(testId: string): Promise<TestClassOverviewResponse> {
+    const res = (await api.get(`/tests/${testId}/class-overview`)) as { data: TestClassOverviewResponse };
     return res.data;
 }
