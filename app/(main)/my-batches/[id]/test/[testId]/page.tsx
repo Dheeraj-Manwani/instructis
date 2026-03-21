@@ -174,6 +174,7 @@ export default function TestDetailPage() {
         search: questionSearch || undefined,
         subject: questionSubject || undefined,
         difficulty: questionDifficulty || undefined,
+        isPractice: false,
         sortBy: "createdAt" as const,
         sortOrder: "desc" as const,
     };

@@ -12,6 +12,7 @@ export type ListQuestionsParams = {
   type?: QuestionType;
   difficulty?: Difficulty;
   isPublished?: boolean;
+  isPractice?: boolean;
   sortBy: "createdAt" | "subject" | "difficulty" | "type";
   sortOrder: "asc" | "desc";
   userId: string;
@@ -39,6 +40,7 @@ export async function listQuestions(
     type: params.type,
     difficulty: params.difficulty,
     isPublished: params.isPublished,
+    isPractice: params.isPractice,
     sortBy: params.sortBy,
     sortOrder: params.sortOrder,
     facultyId,
@@ -76,6 +78,7 @@ export type CreateQuestionInput = {
   topicId?: string;
   explanation?: string;
   isPublished: boolean;
+  isPractice?: boolean;
   options?: { text: string; isCorrect: boolean; orderIndex: number }[];
 };
 

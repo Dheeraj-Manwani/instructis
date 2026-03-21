@@ -25,6 +25,10 @@ export const questionListQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => (v === "true" ? true : v === "false" ? false : undefined)),
+  isPractice: z
+    .string()
+    .optional()
+    .transform((v) => (v === "true" ? true : v === "false" ? false : undefined)),
   sortBy: z.enum(["createdAt", "subject", "difficulty", "type"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -37,6 +41,7 @@ export const createQuestionBodySchema = z.object({
   topicId: z.string().optional(),
   explanation: z.string().optional(),
   isPublished: z.boolean().default(false),
+  isPractice: z.boolean().default(false),
   options: z
     .array(
       z.object({
@@ -57,6 +62,7 @@ export const questionFormSchema = z.object({
   topicId: z.string().optional(),
   explanation: z.string().optional(),
   isPublished: z.boolean(),
+  isPractice: z.boolean(),
   options: z
     .array(
       z.object({ text: z.string().min(1), isCorrect: z.boolean(), orderIndex: z.number() })

@@ -219,11 +219,15 @@ export async function addQuestionToTest(
 
     const question = await prisma.question.findUnique({
         where: { id: questionId },
-        select: { subject: true },
+        select: { subject: true, isPractice: true },
     });
 
     if (!question) {
         throw new NotFoundError("Question not found");
+    }
+
+    if (question.isPractice) {
+        throw new ValidationError("Practice questions cannot be added to mock tests");
     }
 
     if (!allowedSubjects.includes(question.subject)) {

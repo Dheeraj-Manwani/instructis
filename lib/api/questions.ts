@@ -10,6 +10,7 @@ export type QuestionListItem = {
   topicName: string | null;
   facultyId: string;
   isPublished: boolean;
+  isPractice: boolean;
   createdAt: string;
 };
 
@@ -25,6 +26,7 @@ export type ListQuestionsParams = {
   subject?: string;
   difficulty?: string;
   isPublished?: boolean;
+  isPractice?: boolean;
   sortBy?: "createdAt" | "subject" | "difficulty";
   sortOrder?: "asc" | "desc";
 };
@@ -60,6 +62,7 @@ export type CreateQuestionPayload = {
   topicId?: string;
   explanation?: string;
   isPublished: boolean;
+  isPractice?: boolean;
   options?: { text: string; isCorrect: boolean; orderIndex: number }[];
 };
 

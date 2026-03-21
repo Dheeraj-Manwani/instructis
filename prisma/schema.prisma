@@ -154,6 +154,7 @@ model Question {
   faculty     Faculty  @relation(fields: [facultyId], references: [id])
   explanation String?
   isPublished Boolean  @default(false)
+  isPractice  Boolean  @default(false)
   createdAt   DateTime @default(now())
 
   options           QuestionOption[]

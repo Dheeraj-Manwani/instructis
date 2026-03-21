@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, CheckCircle2, XCircle, Lightbulb, Target, Trophy } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Lightbulb, Target, Trophy, Download } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export default function TestAttemptAnalysisPage() {
     const { setBreadcrumb } = useBreadcrumb();
@@ -29,11 +30,42 @@ export default function TestAttemptAnalysisPage() {
     });
 
     const questions = data?.questions ?? [];
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
     const correct = questions.filter((q) => q.isCorrect);
     const incorrect = questions.filter((q) => !q.isCorrect);
     const score = data?.attempt.totalScore ?? 0;
     const totalMarks = data?.test.totalMarks ?? 0;
     const accuracy = questions.length > 0 ? (correct.length / questions.length) * 100 : 0;
+
+    const downloadReport = async () => {
+        if (!data) return;
+
+        setIsGeneratingReport(true);
+        const loadingToastId = toast.loading("Generating report...");
+        try {
+            const response = await fetch(`/api/v1/test-attempts/${attemptId}/report`);
+            if (!response.ok) {
+                throw new Error("Failed to generate report");
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${data.student.name}_${data.test.name}_report.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            toast.success("PDF report downloaded");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to generate report";
+            toast.error(message);
+        } finally {
+            toast.dismiss(loadingToastId);
+            setIsGeneratingReport(false);
+        }
+    };
 
     if (isLoading) {
         return <AnalysisPageSkeleton />;
@@ -57,28 +89,33 @@ export default function TestAttemptAnalysisPage() {
                                 </p>
                             </div>
                         </div>
-                        {data?.attempt?.percentile !== null && typeof data?.attempt?.percentile === "number" && (
-                            <Badge
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            <Button
                                 variant="outline"
-                                className="w-fit rounded-full border-emerald-300 bg-emerald-50 px-3 py-1 font-mono text-emerald-700"
+                                className="gap-2"
+                                onClick={() => void downloadReport()}
+                                disabled={!data || isGeneratingReport}
                             >
-                                Percentile: {data.attempt.percentile.toFixed(1)}%
-                            </Badge>
-                        )}
+                                <Download className="h-4 w-4" />
+                                {isGeneratingReport ? "Generating PDF..." : "Generate Report"}
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p className="text-base font-semibold text-foreground">{data?.student.name ?? "-"}</p>
-                                {data?.student.rollNo ? (
-                                    <p className="text-xs text-muted-foreground">
-                                        Roll No: <span className="font-mono">{data.student.rollNo}</span>
-                                    </p>
-                                ) : null}
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    {data?.student.rollNo ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            Roll No: <span className="font-mono">{data.student.rollNo}</span>
+                                        </p>
+                                    ) : null}
+                                </div>
                             </div>
                             <div className="w-full overflow-x-auto sm:w-auto">
-                                <div className="grid min-w-[430px] grid-cols-4 gap-0 rounded-lg border border-border/70 bg-background text-xs sm:text-sm">
+                                <div className="grid min-w-[560px] grid-cols-5 gap-0 rounded-lg border border-border/70 bg-background text-xs sm:text-sm">
                                     <MiniStat
                                         icon={<Trophy className="h-3.5 w-3.5" />}
                                         label="Total Score"
@@ -103,6 +140,17 @@ export default function TestAttemptAnalysisPage() {
                                         icon={<Target className="h-3.5 w-3.5" />}
                                         label="Accuracy"
                                         value={`${accuracy.toFixed(1)}%`}
+                                        className="rounded-none border-0 border-r border-border/70"
+                                    />
+                                    <MiniStat
+                                        icon={<Target className="h-3.5 w-3.5" />}
+                                        label="Percentile"
+                                        value={
+                                            typeof data?.attempt?.percentile === "number"
+                                                ? `${data.attempt.percentile.toFixed(1)}%`
+                                                : "-"
+                                        }
+                                        valueClassName="text-emerald-700"
                                         className="rounded-none border-0"
                                     />
                                 </div>
@@ -207,7 +255,7 @@ function QuestionRow({
                         <Badge variant="secondary">{q.subject}</Badge>
                         {q.topicName ? <Badge variant="outline">{q.topicName}</Badge> : null}
                         {typeof q.marksAwarded === "number" ? (
-                            <span className="text-xs text-muted-foreground font-mono">+{q.marksAwarded}</span>
+                            <span className="text-xs text-muted-foreground font-mono">{q.marksAwarded > 0 ? "+" : ""}{q.marksAwarded}</span>
                         ) : null}
                     </div>
                     <p className="text-sm font-medium text-foreground">{q.questionText}</p>

@@ -106,13 +106,14 @@ export default function QuestionsPage() {
   const [subject, setSubject] = useState<string>("");
   const [difficulty, setDifficulty] = useState<string>("");
   const [isPublishedFilter, setIsPublishedFilter] = useState<string>("");
+  const [isPracticeFilter, setIsPracticeFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<"createdAt" | "subject" | "difficulty">("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-  }, [search, subject, difficulty, isPublishedFilter]);
+  }, [search, subject, difficulty, isPublishedFilter, isPracticeFilter]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionWithOptions | null>(null);
@@ -128,6 +129,12 @@ export default function QuestionsPage() {
       isPublishedFilter === "true"
         ? true
         : isPublishedFilter === "false"
+          ? false
+          : undefined,
+    isPractice:
+      isPracticeFilter === "true"
+        ? true
+        : isPracticeFilter === "false"
           ? false
           : undefined,
     sortBy,
@@ -258,6 +265,19 @@ export default function QuestionsPage() {
                     <SelectItem value="false">Draft</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select
+                  value={isPracticeFilter || "all"}
+                  onValueChange={(v) => setIsPracticeFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Question type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="false">Non-practice</SelectItem>
+                    <SelectItem value="true">Practice</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Sort by" />
@@ -278,7 +298,7 @@ export default function QuestionsPage() {
               </div>
 
               {isLoading ? (
-                <TableSkeleton rows={8} columns={7} />
+                <TableSkeleton rows={8} columns={8} />
               ) : list.length === 0 ? (
                 <Animate variant="fadeIn">
                   <p className="text-muted-foreground py-8 text-center text-sm">No questions found.</p>
@@ -294,6 +314,7 @@ export default function QuestionsPage() {
                           <TableHead>Subject</TableHead>
                           <TableHead>Topic</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead>Created</TableHead>
                           <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
@@ -320,6 +341,13 @@ export default function QuestionsPage() {
                                 <Badge className="bg-primary/10 text-primary">Published</Badge>
                               ) : (
                                 <Badge variant="outline">Draft</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {q.isPractice ? (
+                                <Badge variant="secondary">Practice</Badge>
+                              ) : (
+                                <Badge variant="outline">Mock-test</Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-muted-foreground text-sm">
@@ -465,6 +493,7 @@ const defaultFormValues: QuestionFormValues = {
   topicId: "",
   explanation: "",
   isPublished: false,
+  isPractice: false,
   options: [
     { text: "", isCorrect: false, orderIndex: 0 },
     { text: "", isCorrect: false, orderIndex: 1 },
@@ -511,6 +540,7 @@ function QuestionModal({
         topicId: editing.topicId ?? "",
         explanation: editing.explanation ?? "",
         isPublished: editing.isPublished,
+        isPractice: editing.isPractice,
         options: opts,
       });
     } else {
@@ -548,6 +578,7 @@ function QuestionModal({
       topicId: values.topicId || undefined,
       explanation: values.explanation || undefined,
       isPublished: values.isPublished,
+      isPractice: values.isPractice,
       options: values.options?.length
         ? values.options.filter((o) => o.text.trim()).map((o, i) => ({ ...o, orderIndex: i }))
         : undefined,
@@ -694,6 +725,24 @@ function QuestionModal({
                         </SelectContent>
                       </Select>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="isPractice"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-2 pt-8 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          className="border-primary data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </FormControl>
+                      <FormLabel className="mt-0! cursor-pointer text-foreground font-medium">
+                        Practice question
+                      </FormLabel>
                     </FormItem>
                   )}
                 />

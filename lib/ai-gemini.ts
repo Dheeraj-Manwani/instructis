@@ -3,16 +3,25 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
-    // eslint-disable-next-line no-console
     console.warn("GEMINI_API_KEY is not set. AI rank predictions will not work.");
 }
 
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+
+// gemini-2.5-flash-lite has the highest free-tier RPM (30 RPM).
+// gemini-2.5-flash is the smarter fallback (5-15 RPM).
+// gemini-2.0-flash is the stable last-resort.
 const GEMINI_MODEL_FALLBACKS = [
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-2.0-flash",
-];
+] as const;
+
+const RETRY_CONFIG = {
+    maxRetries: 3,
+    baseDelayMs: 3000,
+    maxDelayMs: 20000,
+} as const;
 
 function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,57 +40,82 @@ function isRateLimitError(message: string) {
         message.includes("429") ||
         message.includes("Too Many Requests") ||
         message.includes("Quota exceeded") ||
-        message.includes("rate-limits")
+        message.includes("rate-limits") ||
+        message.includes("RESOURCE_EXHAUSTED")
     );
 }
 
-function parseRetryDelayMs(message: string): number {
+function parseRetryDelayMs(message: string, attempt: number): number {
+    // Honour the server's "retry after N seconds" hint if present
     const fromSeconds = message.match(/Please retry in\s+([\d.]+)s/i);
-    if (fromSeconds && fromSeconds[1]) {
+    if (fromSeconds?.[1]) {
         const seconds = Number(fromSeconds[1]);
         if (!Number.isNaN(seconds) && seconds > 0) {
-            // Clamp to keep request latency bounded in API routes.
-            return Math.min(Math.ceil(seconds * 1000), 15000);
+            return Math.min(Math.ceil(seconds * 1000), RETRY_CONFIG.maxDelayMs);
         }
     }
-    return 3000;
+    // Exponential backoff: 3s → 6s → 12s …
+    const backoff = RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt);
+    return Math.min(backoff, RETRY_CONFIG.maxDelayMs);
 }
 
-async function generateWithModelFallback(prompt: string): Promise<string> {
-    if (!genAI) {
-        throw new Error("Gemini client is not configured");
-    }
+async function callModelWithRetry(modelName: string, prompt: string): Promise<string> {
+    if (!genAI) throw new Error("Gemini client is not configured");
 
-    let lastError: unknown = null;
-    for (const modelName of GEMINI_MODEL_FALLBACKS) {
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
         try {
-            const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.generateContent(prompt);
             return result.response.text().trim();
         } catch (error) {
-            lastError = error;
             const message = error instanceof Error ? error.message : String(error);
+
+            // Model doesn't exist — tell caller to try next model immediately
             if (isModelNotFoundError(message)) {
+                throw Object.assign(new Error(message), { isModelNotFound: true });
+            }
+
+            // Rate limited — backoff and retry (same model)
+            if (isRateLimitError(message)) {
+                if (attempt === RETRY_CONFIG.maxRetries) throw error;
+                const delayMs = parseRetryDelayMs(message, attempt);
+                console.warn(
+                    `[Gemini] Rate limit on ${modelName} (attempt ${attempt + 1}). Retrying in ${delayMs}ms…`
+                );
+                await sleep(delayMs);
                 continue;
             }
 
-            if (isRateLimitError(message)) {
-                const delayMs = parseRetryDelayMs(message);
-                await sleep(delayMs);
-                try {
-                    const model = genAI.getGenerativeModel({ model: modelName });
-                    const retried = await model.generateContent(prompt);
-                    return retried.response.text().trim();
-                } catch (retryError) {
-                    lastError = retryError;
-                    const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
-                    if (isModelNotFoundError(retryMessage)) {
-                        continue;
-                    }
-                }
-            } else {
-                throw error;
+            // Any other error — surface immediately, don't waste retries
+            throw error;
+        }
+    }
+
+    throw new Error(`[Gemini] All ${RETRY_CONFIG.maxRetries} retries exhausted for ${modelName}`);
+}
+
+async function generateWithModelFallback(prompt: string): Promise<string> {
+    let lastError: unknown = null;
+
+    for (const modelName of GEMINI_MODEL_FALLBACKS) {
+        try {
+            return await callModelWithRetry(modelName, prompt);
+        } catch (error) {
+            lastError = error;
+            const isNotFound = (error as { isModelNotFound?: boolean }).isModelNotFound === true;
+            if (isNotFound) {
+                console.warn(`[Gemini] Model ${modelName} not found, trying next…`);
+                continue; // try next model in the list
             }
+            // Rate limit exhausted across all retries on this model — try next
+            const message = error instanceof Error ? error.message : String(error);
+            if (isRateLimitError(message)) {
+                console.warn(`[Gemini] Rate limit exhausted on ${modelName}, trying next model…`);
+                continue;
+            }
+            // Unexpected error — rethrow
+            throw error;
         }
     }
 
@@ -89,6 +123,13 @@ async function generateWithModelFallback(prompt: string): Promise<string> {
         ? lastError
         : new Error("No supported Gemini model is available");
 }
+
+function sanitizeJson(raw: string): string {
+    // Strip markdown code fences that models sometimes wrap JSON in
+    return raw.replace(/^```(?:json)?\s*|```\s*$/gim, "").trim();
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export type RankPredictionInput = {
     studentName: string;
@@ -167,9 +208,9 @@ export type StudentRankPredictionAIResult = {
         studyFocus: string;
         practiceQuestionCount: number;
         resourceTypeSuggestion:
-            | "revise formula"
-            | "watch video"
-            | "solve previous year questions";
+        | "revise formula"
+        | "watch video"
+        | "solve previous year questions";
     }>;
     overallImprovementTip: string;
     recommendationCards: {
@@ -179,6 +220,8 @@ export type StudentRankPredictionAIResult = {
     };
     trendStatus: "improving" | "stagnant" | "declining";
 };
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function generateRankPrediction(
     input: RankPredictionInput
@@ -199,13 +242,13 @@ Exam: ${input.examType}
 
 History (oldest to newest):
 ${input.history
-        .map(
-            (h, idx) =>
-                `${idx + 1}. Test: ${h.testName} | Date: ${h.date} | Total Score: ${h.totalScore ?? "N/A"} | Percentile: ${h.percentile ?? "N/A"}`
-        )
-        .join("\n")}
+            .map(
+                (h, idx) =>
+                    `${idx + 1}. Test: ${h.testName} | Date: ${h.date} | Total Score: ${h.totalScore ?? "N/A"} | Percentile: ${h.percentile ?? "N/A"}`
+            )
+            .join("\n")}
 
-Return JSON only in this exact shape:
+Return ONLY valid JSON, no markdown, no explanation, in this exact shape:
 {
   "summary": "high-level 2-4 sentence overview for teacher",
   "nextScoreEstimate": {
@@ -218,34 +261,21 @@ Return JSON only in this exact shape:
 
     try {
         const text = await generateWithModelFallback(prompt);
-        try {
-            const sanitized = text.replace(/^```json\s*|```$/gim, "").trim();
-            const parsed = JSON.parse(sanitized) as RankPredictionAIResult;
-            return parsed;
-        } catch {
-            // Fallback: wrap raw text
-            return {
-                summary: "AI analysis could not be parsed into structured JSON.",
-                nextScoreEstimate: {
-                    expectedPercentile: null,
-                    expectedTotalScore: null,
-                    confidenceNote: "The model returned an unstructured response.",
-                },
-                reasoning: text,
-            };
-        }
-    } catch {
+        const parsed = JSON.parse(sanitizeJson(text)) as RankPredictionAIResult;
+        return parsed;
+    } catch (parseError) {
+        // If JSON parse fails but we got text back, wrap it gracefully
+        const rawText = parseError instanceof SyntaxError ? "" : String(parseError);
         return {
-            summary:
-                "Live AI prediction is temporarily unavailable due to API quota/rate limits. Showing a safe fallback estimate.",
+            summary: rawText
+                ? "AI analysis could not be parsed into structured JSON."
+                : "Live AI prediction is temporarily unavailable. Showing fallback estimate.",
             nextScoreEstimate: {
-                expectedPercentile: input.history[input.history.length - 1]?.percentile ?? null,
-                expectedTotalScore: input.history[input.history.length - 1]?.totalScore ?? null,
-                confidenceNote:
-                    "Fallback estimate used because Gemini free-tier quota is currently exhausted.",
+                expectedPercentile: input.history.at(-1)?.percentile ?? null,
+                expectedTotalScore: input.history.at(-1)?.totalScore ?? null,
+                confidenceNote: "Fallback estimate — AI quota may be exhausted.",
             },
-            reasoning:
-                "Continue regular mock tests and detailed error analysis. Re-run AI prediction after quota reset for personalized insights.",
+            reasoning: rawText || "Continue regular mock tests and detailed error analysis.",
         };
     }
 }
@@ -258,7 +288,7 @@ export async function generateStudentRankPrediction(
     }
 
     const prompt = `You are an academic performance analyst for Indian competitive exams (JEE/NEET).
-Return ONLY strict JSON.
+Return ONLY strict JSON — no markdown, no preamble, no trailing text.
 
 Student profile:
 - Name: ${input.studentName}
@@ -288,11 +318,7 @@ Return JSON in EXACT shape:
     "p95To99": "expected rank range text",
     "p90To95": "expected rank range text"
   },
-  "improvementPointsForNextBand": [
-    "short point 1",
-    "short point 2",
-    "short point 3"
-  ],
+  "improvementPointsForNextBand": ["short point 1", "short point 2", "short point 3"],
   "weakAreaRecommendations": [
     {
       "topicId": "must match input topic id",
@@ -313,50 +339,51 @@ Return JSON in EXACT shape:
 }
 
 Rules:
-- trendStatus must be one of: improving, stagnant, declining
-- resourceTypeSuggestion must be one of: revise formula, watch video, solve previous year questions
-- If weak area exists, include recommendation for each weak area topic
-- Keep language concise, actionable, and student-friendly`;
+- trendStatus must be exactly one of: improving, stagnant, declining
+- resourceTypeSuggestion must be exactly one of: revise formula, watch video, solve previous year questions
+- Include a recommendation for every weak area topic supplied
+- Language must be concise, actionable, and student-friendly`;
 
     try {
         const text = await generateWithModelFallback(prompt);
-        const sanitized = text.replace(/^```json\s*|```$/gim, "").trim();
-        const parsed = JSON.parse(sanitized) as StudentRankPredictionAIResult;
+        const parsed = JSON.parse(sanitizeJson(text)) as StudentRankPredictionAIResult;
         return parsed;
     } catch {
-        // Quota/rate-limit-safe fallback so API does not fail for free-tier keys.
+        // Safe quota-exhaustion fallback
         const latestTargetPercentile =
-            input.targetExam === "JEE" ? input.latestPercentiles.JEE : input.latestPercentiles.NEET;
+            input.targetExam === "JEE"
+                ? input.latestPercentiles.JEE
+                : input.latestPercentiles.NEET;
         const safePercentile = Math.max(0, Math.min(100, latestTargetPercentile ?? 0));
         const estimatedRank = Math.max(1, Math.round(((100 - safePercentile) / 100) * 100_000));
-        const weakAreaRecommendations = input.weakAreas.map((wa) => ({
-            topicId: wa.id,
-            topicName: wa.topicName,
-            subject: wa.subject,
-            studyFocus: `Revise fundamentals and solve 20-30 focused questions for ${wa.topicName}.`,
-            practiceQuestionCount: 25,
-            resourceTypeSuggestion: "solve previous year questions" as const,
-        }));
 
         return {
             predictedRankRange: {
-                JEE: input.latestPercentiles.JEE != null ? `${estimatedRank}-${estimatedRank + 1200}` : null,
-                NEET: input.latestPercentiles.NEET != null ? `${estimatedRank}-${estimatedRank + 1200}` : null,
+                JEE: input.latestPercentiles.JEE != null
+                    ? `${estimatedRank}-${estimatedRank + 1200}`
+                    : null,
+                NEET: input.latestPercentiles.NEET != null
+                    ? `${estimatedRank}-${estimatedRank + 1200}`
+                    : null,
             },
-            targetPercentileNeeded: {
-                top1000: 98.9,
-                top3000: 96.8,
-            },
+            targetPercentileNeeded: { top1000: 98.9, top3000: 96.8 },
             percentileBandRankEstimate: {
-                p95To99: "Approx. top 1,000 - 5,000 (varies by year and exam difficulty)",
-                p90To95: "Approx. top 5,000 - 20,000 (varies by year and exam difficulty)",
+                p95To99: "Approx. top 1,000–5,000 (varies by difficulty)",
+                p90To95: "Approx. top 5,000–20,000 (varies by difficulty)",
             },
             improvementPointsForNextBand: [
                 "Increase weekly mock-test consistency and detailed error review.",
                 "Prioritize high-frequency weak topics with timed practice.",
                 "Track careless errors separately and reduce them test by test.",
             ],
-            weakAreaRecommendations,
+            weakAreaRecommendations: input.weakAreas.map((wa) => ({
+                topicId: wa.id,
+                topicName: wa.topicName,
+                subject: wa.subject,
+                studyFocus: `Revise fundamentals and solve 20-30 focused questions for ${wa.topicName}.`,
+                practiceQuestionCount: 25,
+                resourceTypeSuggestion: "solve previous year questions" as const,
+            })),
             overallImprovementTip:
                 "Live AI prediction is temporarily rate-limited. Continue regular mock tests and focused weak-area practice for steady rank improvement.",
             recommendationCards: {
@@ -368,4 +395,3 @@ Rules:
         };
     }
 }
-

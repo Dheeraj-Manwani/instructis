@@ -79,7 +79,7 @@ export default function LandingPage() {
         )}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center">
             <div className="w-9 h-9 rounded-xl bg-transparent flex items-center justify-center overflow-hidden">
               <Image
                 src={appLogo}

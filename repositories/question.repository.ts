@@ -12,6 +12,7 @@ export type QuestionListItem = {
   topicName: string | null;
   facultyId: string;
   isPublished: boolean;
+  isPractice: boolean;
   createdAt: Date;
 };
 
@@ -28,6 +29,7 @@ type ListParams = {
   type?: QuestionType;
   difficulty?: Difficulty;
   isPublished?: boolean;
+  isPractice?: boolean;
   sortBy: "createdAt" | "subject" | "difficulty" | "type";
   sortOrder: "asc" | "desc";
   facultyId?: string; // when provided, filter by faculty (for FACULTY role)
@@ -58,6 +60,7 @@ export async function findManyQuestions(
   if (type) where.type = type;
   if (difficulty) where.difficulty = difficulty;
   if (typeof isPublished === "boolean") where.isPublished = isPublished;
+  if (typeof params.isPractice === "boolean") where.isPractice = params.isPractice;
 
   const orderBy = { [sortBy]: sortOrder } as const;
 
@@ -84,6 +87,7 @@ export async function findManyQuestions(
     topicName: q.topic?.name ?? null,
     facultyId: q.facultyId,
     isPublished: q.isPublished,
+    isPractice: q.isPractice,
     createdAt: q.createdAt,
   }));
 
@@ -111,6 +115,7 @@ export async function findQuestionById(
     topicName: q.topic?.name ?? null,
     facultyId: q.facultyId,
     isPublished: q.isPublished,
+    isPractice: q.isPractice,
     createdAt: q.createdAt,
     explanation: q.explanation,
     options: q.options.map((o) => ({
@@ -138,6 +143,7 @@ type CreateData = {
   topicId?: string;
   explanation?: string;
   isPublished: boolean;
+  isPractice?: boolean;
   facultyId: string;
   options?: { text: string; isCorrect: boolean; orderIndex: number }[];
 };
@@ -173,6 +179,7 @@ export async function createQuestion(data: CreateData): Promise<QuestionWithOpti
     topicName: question.topic?.name ?? null,
     facultyId: question.facultyId,
     isPublished: question.isPublished,
+    isPractice: question.isPractice,
     createdAt: question.createdAt,
     explanation: question.explanation,
     options: question.options.map((o) => ({
@@ -192,6 +199,7 @@ type UpdateData = Partial<{
   topicId: string | null;
   explanation: string | null;
   isPublished: boolean;
+  isPractice: boolean;
   options: { text: string; isCorrect: boolean; orderIndex: number }[];
 }>;
 
@@ -234,6 +242,7 @@ export async function updateQuestion(
     topicName: question.topic?.name ?? null,
     facultyId: question.facultyId,
     isPublished: question.isPublished,
+    isPractice: question.isPractice,
     createdAt: question.createdAt,
     explanation: question.explanation,
     options: question.options.map((o) => ({
