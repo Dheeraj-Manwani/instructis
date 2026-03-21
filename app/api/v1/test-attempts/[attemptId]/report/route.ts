@@ -35,6 +35,10 @@ export const GET = catchAsync(async (req, { params }) => {
     if (!attempt) {
         throw new NotFoundError("Test attempt not found");
     }
+    if (!attempt.mockTest) {
+        throw new NotFoundError("Mock test for this attempt was not found");
+    }
+    const mockTest = attempt.mockTest;
 
     if (session.user.role === "STUDENT") {
         if (attempt.student.user.id !== session.user.id) {
@@ -45,7 +49,7 @@ export const GET = catchAsync(async (req, { params }) => {
             where: { userId: session.user.id },
             select: { id: true },
         });
-        if (!faculty || faculty.id !== attempt.mockTest.facultyId) {
+        if (!faculty || faculty.id !== mockTest.facultyId) {
             throw new ForbiddenError("You do not have permission to download this report");
         }
     }

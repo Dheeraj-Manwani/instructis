@@ -46,6 +46,10 @@ export const GET = catchAsync(async (req, { params }) => {
     if (!attempt) {
         throw new NotFoundError("Test attempt not found");
     }
+    if (!attempt.mockTest) {
+        throw new NotFoundError("Mock test for this attempt was not found");
+    }
+    const mockTest = attempt.mockTest;
 
     if (session.user.role === "STUDENT") {
         // Students should only access their own attempt analysis
@@ -60,7 +64,7 @@ export const GET = catchAsync(async (req, { params }) => {
                 select: { id: true },
             });
 
-            if (!faculty || faculty.id !== attempt.mockTest.facultyId) {
+            if (!faculty || faculty.id !== mockTest.facultyId) {
                 throw new ForbiddenError("You do not have permission to view this analysis");
             }
         }
@@ -68,7 +72,7 @@ export const GET = catchAsync(async (req, { params }) => {
 
     const [mockQuestions, studentAnswers] = await Promise.all([
         prisma.mockTestQuestion.findMany({
-            where: { mockTestId: attempt.mockTestId },
+            where: { mockTestId: mockTest.id },
             select: { questionId: true, orderIndex: true },
             orderBy: { orderIndex: "asc" },
         }),
@@ -176,12 +180,12 @@ export const GET = catchAsync(async (req, { params }) => {
             percentile: attempt.percentile,
             timeTaken: attempt.timeTaken,
         },
-        batch: attempt.mockTest.batch,
+        batch: mockTest.batch,
         test: {
-            id: attempt.mockTest.id,
-            name: attempt.mockTest.name,
-            duration: attempt.mockTest.duration,
-            totalMarks: attempt.mockTest.totalMarks,
+            id: mockTest.id,
+            name: mockTest.name,
+            duration: mockTest.duration,
+            totalMarks: mockTest.totalMarks,
         },
         student: {
             id: attempt.student.id,

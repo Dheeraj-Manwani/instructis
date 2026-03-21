@@ -134,30 +134,26 @@ export default function StudentAIRankPredictorPage() {
         label: allLabelsIdentical ? `Test ${idx + 1}` : point.label,
     }));
 
-    if (predictorQuery.isLoading || refreshMutation.isPending) {
+    if (predictorQuery.isLoading) {
         return (
             <div className="space-y-5">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Sparkles className="h-4 w-4 animate-pulse text-primary" />
-                    <span className="animate-pulse">Gemini is analyzing your performance...</span>
-                </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
-                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
-                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
-                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
+                    <Skeleton className="h-28 w-full rounded-xl" />
+                    <Skeleton className="h-28 w-full rounded-xl" />
+                    <Skeleton className="h-28 w-full rounded-xl" />
+                    <Skeleton className="h-28 w-full rounded-xl" />
                 </div>
-                <Skeleton className="h-20 w-full animate-pulse rounded-xl" />
-                <Skeleton className="h-44 w-full animate-pulse rounded-xl" />
+                <Skeleton className="h-20 w-full rounded-xl" />
+                <Skeleton className="h-44 w-full rounded-xl" />
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.7fr_1fr]">
-                    <Skeleton className="h-64 w-full animate-pulse rounded-xl" />
+                    <Skeleton className="h-64 w-full rounded-xl" />
                     <div className="space-y-3">
-                        <Skeleton className="h-32 w-full animate-pulse rounded-xl" />
-                        <Skeleton className="h-24 w-full animate-pulse rounded-xl" />
-                        <Skeleton className="h-24 w-full animate-pulse rounded-xl" />
+                        <Skeleton className="h-32 w-full rounded-xl" />
+                        <Skeleton className="h-24 w-full rounded-xl" />
+                        <Skeleton className="h-24 w-full rounded-xl" />
                     </div>
                 </div>
-                <Skeleton className="h-64 w-full animate-pulse rounded-xl" />
+                <Skeleton className="h-64 w-full rounded-xl" />
             </div>
         );
     }
@@ -223,6 +219,20 @@ export default function StudentAIRankPredictorPage() {
                 </div>
             </div>
 
+            {refreshMutation.isPending && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                        <span className="font-medium text-foreground">
+                            Gemini is analyzing your performance...
+                        </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Building trends, rank context, and actionable insights.
+                    </p>
+                </div>
+            )}
+
             {showLastSavedNote && (
                 <p className="text-xs text-warning">Showing last saved prediction.</p>
             )}
@@ -278,18 +288,6 @@ export default function StudentAIRankPredictorPage() {
                 />
             </div>
 
-            {!data.ai ? (
-                <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3">
-                    <button
-                        onClick={() => refreshMutation.mutate()}
-                        className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                    >
-                        <Sparkles className="h-4 w-4" />
-                        Predict metrics with Gemini
-                    </button>
-                </div>
-            ) : null}
-
             {data.ai?.summaryTexts?.performanceSnapshot ? (
                 <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
                     <p className="text-sm font-medium text-foreground">
@@ -301,42 +299,44 @@ export default function StudentAIRankPredictorPage() {
                 </div>
             ) : null}
 
-            <div className="rounded-lg border border-border bg-card p-5">
-                <h3 className="text-sm font-bold text-foreground">Percentile Band Visualization</h3>
-                <div className="relative mt-4">
-                    <div className="flex h-5 w-full overflow-hidden rounded-full">
-                        <div className="w-[25%] bg-destructive" />
-                        <div className="w-[25%] bg-warning" />
-                        <div className="w-[25%] bg-amber-500" />
-                        <div className="w-[25%] bg-green-700" />
+            {data.ai && (
+                <div className="rounded-lg border border-border bg-card p-5">
+                    <h3 className="text-sm font-bold text-foreground">Percentile Band Visualization</h3>
+                    <div className="relative mt-4">
+                        <div className="flex h-5 w-full overflow-hidden rounded-full">
+                            <div className="w-[25%] bg-destructive" />
+                            <div className="w-[25%] bg-warning" />
+                            <div className="w-[25%] bg-amber-500" />
+                            <div className="w-[25%] bg-green-700" />
+                        </div>
+                        <div
+                            className="absolute -top-8"
+                            style={{
+                                left: `clamp(8px, calc(${markerPercentile}% - 8px), calc(100% - 8px))`,
+                            }}
+                        >
+                            <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold text-background">You are here</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-4 text-center text-[10px] text-muted-foreground">
+                            <span>Below 70%</span>
+                            <span>70-85%</span>
+                            <span>85-95%</span>
+                            <span>95-100%</span>
+                        </div>
                     </div>
-                    <div
-                        className="absolute -top-8"
-                        style={{
-                            left: `clamp(8px, calc(${markerPercentile}% - 8px), calc(100% - 8px))`,
-                        }}
-                    >
-                        <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold text-background">You are here</span>
-                    </div>
-                    <div className="mt-2 grid grid-cols-4 text-center text-[10px] text-muted-foreground">
-                        <span>Below 70%</span>
-                        <span>70-85%</span>
-                        <span>85-95%</span>
-                        <span>95-100%</span>
-                    </div>
-                </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="rounded-md border border-border p-3">
-                        <p className="text-xs text-muted-foreground">Target 95-99 percentile</p>
-                        <p className="text-sm font-bold text-foreground">{data.ai?.percentileBandRankEstimate.p95To99 ?? "N/A"}</p>
-                    </div>
-                    <div className="rounded-md border border-border p-3">
-                        <p className="text-xs text-muted-foreground">Target 90-95 percentile</p>
-                        <p className="text-sm font-bold text-foreground">{data.ai?.percentileBandRankEstimate.p90To95 ?? "N/A"}</p>
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="rounded-md border border-border p-3">
+                            <p className="text-xs text-muted-foreground">Target 95-99 percentile</p>
+                            <p className="text-sm font-bold text-foreground">{data.ai.percentileBandRankEstimate.p95To99}</p>
+                        </div>
+                        <div className="rounded-md border border-border p-3">
+                            <p className="text-xs text-muted-foreground">Target 90-95 percentile</p>
+                            <p className="text-sm font-bold text-foreground">{data.ai.percentileBandRankEstimate.p90To95}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.7fr_1fr]">
                 <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -393,28 +393,30 @@ export default function StudentAIRankPredictorPage() {
                     )}
                 </div>
 
-                <div className="space-y-3">
-                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                        <div className="mb-2 inline-flex items-center gap-2 text-primary">
-                            <Sparkles className="h-4 w-4" />
-                            <span className="text-sm font-semibold">AI Improvement Tip</span>
-                            {trendIcon}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            {data.ai?.summaryTexts?.nextStepFocus ??
-                                data.ai?.overallImprovementTip ??
-                                "Refresh prediction to get personalized suggestions."}
-                        </p>
-                        {data.ai?.overallImprovementTip ? (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                {data.ai.overallImprovementTip}
+                {data.ai && (
+                    <div className="space-y-3">
+                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                            <div className="mb-2 inline-flex items-center gap-2 text-primary">
+                                <Sparkles className="h-4 w-4" />
+                                <span className="text-sm font-semibold">AI Improvement Tip</span>
+                                {trendIcon}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                {data.ai.summaryTexts?.nextStepFocus ??
+                                    data.ai.overallImprovementTip ??
+                                    "Refresh prediction to get personalized suggestions."}
                             </p>
-                        ) : null}
+                            {data.ai.overallImprovementTip ? (
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    {data.ai.overallImprovementTip}
+                                </p>
+                            ) : null}
+                        </div>
+                        <RecommendationCard title="Practice Recommendation" text={data.ai.recommendationCards.practice} />
+                        <RecommendationCard title="Video / Revision Recommendation" text={data.ai.recommendationCards.videoOrRevision} />
+                        <RecommendationCard title="Formula Revision Recommendation" text={data.ai.recommendationCards.formulaRevision} />
                     </div>
-                    <RecommendationCard title="Practice Recommendation" text={data.ai?.recommendationCards.practice ?? "N/A"} />
-                    <RecommendationCard title="Video / Revision Recommendation" text={data.ai?.recommendationCards.videoOrRevision ?? "N/A"} />
-                    <RecommendationCard title="Formula Revision Recommendation" text={data.ai?.recommendationCards.formulaRevision ?? "N/A"} />
-                </div>
+                )}
             </div>
 
             <div className="rounded-lg border border-border bg-card p-4">

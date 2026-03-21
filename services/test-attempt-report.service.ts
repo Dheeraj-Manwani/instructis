@@ -97,9 +97,13 @@ export async function generateTestAttemptReportPdf(attemptId: string): Promise<{
     if (!attempt) {
         throw new NotFoundError("Test attempt not found");
     }
+    if (!attempt.mockTest) {
+        throw new NotFoundError("Mock test for this attempt was not found");
+    }
+    const mockTest = attempt.mockTest;
 
     const allAttempts = await prisma.testAttempt.findMany({
-        where: { mockTestId: attempt.mockTestId },
+        where: { mockTestId: mockTest.id },
         select: {
             id: true,
             totalScore: true,
@@ -124,11 +128,11 @@ export async function generateTestAttemptReportPdf(attemptId: string): Promise<{
     const highestPercentile = percentileValues.length > 0 ? Math.max(...percentileValues) : null;
 
     const orderByQuestionId = new Map(
-        attempt.mockTest.questions.map((q) => [q.questionId, q.orderIndex])
+        mockTest.questions.map((q) => [q.questionId, q.orderIndex])
     );
 
     const maxMarksBySubject = new Map<string, number>();
-    for (const q of attempt.mockTest.questions) {
+    for (const q of mockTest.questions) {
         const subject = q.question.subject;
         maxMarksBySubject.set(subject, (maxMarksBySubject.get(subject) ?? 0) + q.marks);
     }
@@ -237,13 +241,13 @@ export async function generateTestAttemptReportPdf(attemptId: string): Promise<{
     }
 
     const pdfData: StudentReportPdfData = {
-        examType: attempt.mockTest.batch?.examType ?? "N/A",
+        examType: mockTest.batch?.examType ?? "N/A",
         studentName: attempt.student.user.name,
         rollNo: attempt.student.rollNo,
-        batchName: attempt.mockTest.batch?.name ?? "N/A",
-        testName: attempt.mockTest.name,
+        batchName: mockTest.batch?.name ?? "N/A",
+        testName: mockTest.name,
         score: attempt.totalScore,
-        maxMarks: attempt.mockTest.totalMarks,
+        maxMarks: mockTest.totalMarks,
         rank: classRank,
         accuracy: accuracy ? `${accuracy}%` : null,
         questionsAttempted: answeredCount,
@@ -264,7 +268,7 @@ export async function generateTestAttemptReportPdf(attemptId: string): Promise<{
         React.createElement(StudentReportPdf, { data: pdfData, logoBase64 }) as unknown as React.ReactElement
     );
     const pdfBytes = new Uint8Array(pdfBuffer);
-    const filename = `${sanitizeFilename(attempt.student.user.name)}_${sanitizeFilename(attempt.mockTest.name)}_report.pdf`;
+    const filename = `${sanitizeFilename(attempt.student.user.name)}_${sanitizeFilename(mockTest.name)}_report.pdf`;
 
     return { pdfBytes, filename };
 }

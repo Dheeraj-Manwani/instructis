@@ -48,6 +48,7 @@ export default function PracticePage() {
     const practiceQuery = useQuery({
         queryKey: ["practice-screen", selectedTopicId ?? "default"],
         queryFn: () => fetchPracticeScreen(selectedTopicId),
+        placeholderData: (previousData) => previousData,
     });
 
     const startSessionMutation = useMutation({
@@ -111,6 +112,7 @@ export default function PracticePage() {
     );
     const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
     const isSessionComplete = totalQuestions > 0 && answeredCount >= totalQuestions;
+    const isRightPanelLoading = practiceQuery.isFetching;
 
     const canSubmit =
         !!attemptId &&
@@ -215,7 +217,7 @@ export default function PracticePage() {
             </aside>
 
             <section className="rounded-lg border border-border bg-card p-5">
-                {practiceQuery.isLoading ? (
+                {isRightPanelLoading ? (
                     <p className="text-sm text-muted-foreground">Loading practice session...</p>
                 ) : weakAreas.length === 0 ? (
                     <div className="flex min-h-[320px] items-center justify-center text-center">

@@ -116,6 +116,7 @@ export const GET = catchAsync(async (req, { params }) => {
     for (const a of attempts) {
         const bucket = attemptByStudent.get(a.studentId);
         if (!bucket) continue;
+        if (!a.mockTest) continue;
 
         if (a.mockTestId === testId) {
             bucket.current = a;
@@ -124,7 +125,8 @@ export const GET = catchAsync(async (req, { params }) => {
 
         // Previous: last submitted attempt strictly before current test timestamp.
         if (a.mockTest.createdAt < currentTest.createdAt && a.submittedAt !== null && a.totalScore !== null) {
-            if (!bucket.previous || a.mockTest.createdAt > bucket.previous.mockTest.createdAt) {
+            const previousCreatedAt = bucket.previous?.mockTest?.createdAt;
+            if (!previousCreatedAt || a.mockTest.createdAt > previousCreatedAt) {
                 bucket.previous = a;
             }
         }
