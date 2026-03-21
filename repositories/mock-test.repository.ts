@@ -3,6 +3,55 @@ import { NotFoundError, ValidationError } from "@/lib/utils/errors";
 import { ExamType, Prisma } from "@prisma/client";
 import chalk from "chalk";
 
+function requireMockTestId(mockTestId: string | null): string {
+    if (!mockTestId) {
+        throw new ValidationError("Invalid test attempt: missing mock test reference");
+    }
+    return mockTestId;
+}
+
+async function normalizeTestQuestionOrderIndexes(testId: string): Promise<void> {
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+        const rows = await prisma.mockTestQuestion.findMany({
+            where: { mockTestId: testId },
+            select: { id: true, orderIndex: true },
+            orderBy: [{ orderIndex: "asc" }, { id: "asc" }],
+        });
+
+        const needsNormalization = rows.some((row, index) => row.orderIndex !== index + 1);
+        if (!needsNormalization) return;
+
+        const phase1 = rows.map((row, index) =>
+            prisma.mockTestQuestion.update({
+                where: { id: row.id },
+                data: { orderIndex: -(index + 1) },
+            })
+        );
+
+        const phase2 = rows.map((row, index) =>
+            prisma.mockTestQuestion.update({
+                where: { id: row.id },
+                data: { orderIndex: index + 1 },
+            })
+        );
+
+        try {
+            await prisma.$transaction([...phase1, ...phase2]);
+            return;
+        } catch (error) {
+            const isRetryable =
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                ["P2002", "P2010", "P2028", "P2034"].includes(error.code);
+            if (!isRetryable || attempt === maxRetries - 1) {
+                throw error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+        }
+    }
+}
+
 export type MockTestListItem = {
     id: string;
     name: string;
@@ -255,11 +304,10 @@ export async function addQuestionToTest(
     const maxRetries = 5;
     for (let attempt = 0; attempt < maxRetries; attempt += 1) {
         const retryNumber = attempt + 1;
-        const maxOrder = await prisma.mockTestQuestion.aggregate({
+        const totalInTest = await prisma.mockTestQuestion.count({
             where: { mockTestId: testId },
-            _max: { orderIndex: true },
         });
-        const nextOrder = (maxOrder._max.orderIndex ?? 0) + 1;
+        const nextOrder = totalInTest + 1;
 
         try {
             const created = await prisma.mockTestQuestion.create({
@@ -348,6 +396,32 @@ export async function updateTestQuestion(
         },
     });
 
+    if (typeof data.orderIndex === "number") {
+        await normalizeTestQuestionOrderIndexes(testId);
+        const normalized = await prisma.mockTestQuestion.findUnique({
+            where: { id: testQuestionId },
+            include: {
+                question: {
+                    select: {
+                        id: true,
+                        text: true,
+                        difficulty: true,
+                        subject: true,
+                        topic: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!normalized) {
+            throw new NotFoundError("Test question not found");
+        }
+        return mapTestQuestion(normalized);
+    }
+
     return mapTestQuestion(updated);
 }
 
@@ -363,6 +437,7 @@ export async function removeQuestionFromTest(testId: string, testQuestionId: str
     await prisma.mockTestQuestion.delete({
         where: { id: testQuestionId },
     });
+    await normalizeTestQuestionOrderIndexes(testId);
 }
 
 export async function reorderTestQuestions(
@@ -391,7 +466,19 @@ export async function reorderTestQuestions(
         throw new NotFoundError("One or more test questions were not found in this test");
     }
 
-    await prisma.$transaction(
+    // Two-phase reorder avoids unique conflicts on (mockTestId, orderIndex):
+    // 1) move changed rows to temporary negative indexes
+    // 2) assign their final target indexes
+    await Promise.all(
+        items.map((item, index) =>
+            prisma.mockTestQuestion.update({
+                where: { id: item.testQuestionId },
+                data: { orderIndex: -(index + 1) },
+            })
+        )
+    );
+
+    await Promise.all(
         items.map((item) =>
             prisma.mockTestQuestion.update({
                 where: { id: item.testQuestionId },
@@ -399,6 +486,8 @@ export async function reorderTestQuestions(
             })
         )
     );
+
+    await normalizeTestQuestionOrderIndexes(testId);
 
     return findTestQuestionsByTestId(testId);
 }
@@ -451,7 +540,7 @@ export async function findTestAttemptsByTestId(testId: string): Promise<TestAtte
     return attempts.map((attempt) => ({
         id: attempt.id,
         studentId: attempt.studentId,
-        mockTestId: attempt.mockTestId,
+        mockTestId: requireMockTestId(attempt.mockTestId),
         student: {
             id: attempt.student.id,
             rollNo: attempt.student.rollNo,
@@ -513,28 +602,33 @@ export async function findTestAttemptsByStudentInBatch(
         orderBy: { startedAt: "asc" },
     });
 
-    return attempts.map((attempt) => ({
-        id: attempt.id,
-        studentId: attempt.studentId,
-        mockTestId: attempt.mockTestId,
-        student: {
-            id: attempt.student.id,
-            rollNo: attempt.student.rollNo,
-            user: attempt.student.user,
-        },
-        startedAt: attempt.startedAt,
-        submittedAt: attempt.submittedAt,
-        physicsMarks: attempt.physicsMarks,
-        chemistryMarks: attempt.chemistryMarks,
-        mathematicsMarks: attempt.mathematicsMarks,
-        zoologyMarks: attempt.zoologyMarks,
-        botanyMarks: attempt.botanyMarks,
-        totalScore: attempt.totalScore,
-        percentile: attempt.percentile,
-        timeTaken: attempt.timeTaken,
-        isNotified: attempt.isNotified,
-        mockTest: attempt.mockTest,
-    }));
+    return attempts
+        .filter(
+            (attempt): attempt is typeof attempt & { mockTestId: string; mockTest: { id: string; name: string } } =>
+                !!attempt.mockTestId && !!attempt.mockTest
+        )
+        .map((attempt) => ({
+            id: attempt.id,
+            studentId: attempt.studentId,
+            mockTestId: attempt.mockTestId,
+            student: {
+                id: attempt.student.id,
+                rollNo: attempt.student.rollNo,
+                user: attempt.student.user,
+            },
+            startedAt: attempt.startedAt,
+            submittedAt: attempt.submittedAt,
+            physicsMarks: attempt.physicsMarks,
+            chemistryMarks: attempt.chemistryMarks,
+            mathematicsMarks: attempt.mathematicsMarks,
+            zoologyMarks: attempt.zoologyMarks,
+            botanyMarks: attempt.botanyMarks,
+            totalScore: attempt.totalScore,
+            percentile: attempt.percentile,
+            timeTaken: attempt.timeTaken,
+            isNotified: attempt.isNotified,
+            mockTest: attempt.mockTest,
+        }));
 }
 
 export type UpdateMockTestInput = Partial<{
@@ -628,7 +722,7 @@ export async function createOrUpdateTestAttempt(
         return {
             id: attempt.id,
             studentId: attempt.studentId,
-            mockTestId: attempt.mockTestId,
+            mockTestId: requireMockTestId(attempt.mockTestId),
             student: {
                 id: attempt.student.id,
                 rollNo: attempt.student.rollNo,
@@ -679,7 +773,7 @@ export async function createOrUpdateTestAttempt(
         return {
             id: attempt.id,
             studentId: attempt.studentId,
-            mockTestId: attempt.mockTestId,
+            mockTestId: requireMockTestId(attempt.mockTestId),
             student: {
                 id: attempt.student.id,
                 rollNo: attempt.student.rollNo,
@@ -749,7 +843,7 @@ export async function markTestAttemptNotified(attemptId: string): Promise<TestAt
     return {
         id: attempt.id,
         studentId: attempt.studentId,
-        mockTestId: attempt.mockTestId,
+        mockTestId: requireMockTestId(attempt.mockTestId),
         student: {
             id: attempt.student.id,
             rollNo: attempt.student.rollNo,

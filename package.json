@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:questions": "npx tsx prisma/seed-questions.ts",
+    "seed:practice-questions": "npx tsx prisma/seed-practice-questions.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

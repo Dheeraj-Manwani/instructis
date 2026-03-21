@@ -60,6 +60,7 @@ const allNavItems: NavItem[] = [
   // existing student items
   { title: "My Tests", path: "/my-tests", icon: FileText, roles: [RoleEnum.STUDENT] },
   { title: "AI Rank Predictor", path: "/ai-rank-predictor", icon: Brain, roles: [RoleEnum.STUDENT] },
+  { title: "Practice", path: "/practice", icon: BookOpen, roles: [RoleEnum.STUDENT] },
 
   // existing admin items
   { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },

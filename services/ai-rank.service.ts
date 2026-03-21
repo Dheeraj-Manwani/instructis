@@ -216,7 +216,7 @@ type StudentRankPredictorResponse = {
     currentPercentile: number | null;
     currentPredictedRank: number | null;
     performanceTrend: Array<{
-        testDate: string;
+        label: string;
         marks: number;
         percentile: number | null;
     }>;
@@ -240,6 +240,11 @@ type StudentRankPredictorResponse = {
         percentileBandRankEstimate: { p95To99: string; p90To95: string };
         improvementPointsForNextBand: string[];
         overallImprovementTip: string;
+        summaryTexts: {
+            performanceSnapshot: string | null;
+            rankContext: string | null;
+            nextStepFocus: string | null;
+        };
         recommendationCards: {
             practice: string;
             videoOrRevision: string;
@@ -288,10 +293,16 @@ export async function getStudentRankPredictorByUserId(
         allExamTypes.length > 0 ? allExamTypes : [toExamTypeLabel(studentData.targetExam)];
     const selectedExamType = toExamTypeLabel(studentData.targetExam);
 
-    const marksForSelectedExam = studentData.marks.filter(
-        (mark) => toExamTypeLabel(mark.examType) === selectedExamType
+    const testSummariesForSelectedExam = studentData.testSummaries.filter(
+        (summary) => toExamTypeLabel(summary.examType) === selectedExamType
     );
-    const latestMark = marksForSelectedExam[marksForSelectedExam.length - 1] ?? null;
+    const latestSummary = testSummariesForSelectedExam.at(-1) ?? null;
+    const previousSummary = testSummariesForSelectedExam.at(-2) ?? null;
+    const latestPercentile = latestSummary?.percentile ?? null;
+    const derivedRank =
+        latestPercentile != null
+            ? Math.max(1, Math.round(((100 - latestPercentile) / 100) * 100_000))
+            : null;
 
     const latestPercentileByExam = {
         JEE:
@@ -335,14 +346,17 @@ export async function getStudentRankPredictorByUserId(
     return {
         examType: selectedExamType,
         availableExamTypes,
-        latestTotalMarks: latestMark?.marksObtained ?? null,
-        latestImprovement: latestMark?.improvement ?? null,
-        currentPercentile: latestMark?.percentile ?? null,
-        currentPredictedRank: latestStoredPrediction?.predictedRank ?? null,
-        performanceTrend: studentData.marks.map((mark) => ({
-            testDate: mark.createdAt.toISOString().split("T")[0],
-            marks: mark.marksObtained,
-            percentile: mark.percentile,
+        latestTotalMarks: latestSummary?.totalMarks ?? null,
+        latestImprovement:
+            latestSummary && previousSummary
+                ? latestSummary.totalMarks - previousSummary.totalMarks
+                : null,
+        currentPercentile: latestPercentile,
+        currentPredictedRank: derivedRank,
+        performanceTrend: testSummariesForSelectedExam.map((summary) => ({
+            label: summary.testName,
+            marks: summary.totalMarks,
+            percentile: summary.percentile,
         })),
         weakAreas: studentData.weakAreas.map((wa) => {
             const rec = weakAreaRecs.find((r) => r.topicId === wa.topicId);
@@ -397,6 +411,37 @@ export async function getStudentRankPredictorByUserId(
                   overallImprovementTip:
                       (parsedPredictionJson.overallImprovementTip as string) ??
                       "Complete more tests to generate personalized tips.",
+                  summaryTexts:
+                      ((parsedPredictionJson.summaryTexts as {
+                          performanceSnapshot?: string | null;
+                          rankContext?: string | null;
+                          nextStepFocus?: string | null;
+                      })
+                          ? {
+                                performanceSnapshot:
+                                    (
+                                        parsedPredictionJson.summaryTexts as {
+                                            performanceSnapshot?: string | null;
+                                        }
+                                    ).performanceSnapshot ?? null,
+                                rankContext:
+                                    (
+                                        parsedPredictionJson.summaryTexts as {
+                                            rankContext?: string | null;
+                                        }
+                                    ).rankContext ?? null,
+                                nextStepFocus:
+                                    (
+                                        parsedPredictionJson.summaryTexts as {
+                                            nextStepFocus?: string | null;
+                                        }
+                                    ).nextStepFocus ?? null,
+                            }
+                          : {
+                                performanceSnapshot: null,
+                                rankContext: null,
+                                nextStepFocus: null,
+                            }),
                   recommendationCards:
                       {
                           practice:
@@ -457,42 +502,52 @@ export async function refreshStudentRankPredictorByUserId(
         throw new AppError("Student profile not found", 404);
     }
 
-    if (studentData.marks.length === 0) {
+    if (studentData.testSummaries.length === 0) {
         throw new AppError("Complete at least one test to generate prediction", 400);
     }
 
-    const latestPercentiles = {
-        JEE:
-            [...studentData.marks]
-                .reverse()
-                .find((m) => m.examType === "JEE" && m.percentile != null)?.percentile ?? null,
-        NEET:
-            [...studentData.marks]
-                .reverse()
-                .find((m) => m.examType === "NEET" && m.percentile != null)?.percentile ?? null,
+    const summariesByExam = {
+        JEE: studentData.testSummaries.filter((summary) => summary.examType === "JEE"),
+        NEET: studentData.testSummaries.filter((summary) => summary.examType === "NEET"),
     };
+
+    const latestPercentiles = {
+        JEE: summariesByExam.JEE.at(-1)?.percentile ?? null,
+        NEET: summariesByExam.NEET.at(-1)?.percentile ?? null,
+    };
+
+    const targetExamLabel = toExamTypeLabel(studentData.targetExam);
+    const testSummariesForTargetExam = studentData.testSummaries.filter(
+        (summary) => toExamTypeLabel(summary.examType) === targetExamLabel
+    );
+    const weakAreasPayload =
+        studentData.weakAreas.length === 0
+            ? []
+            : studentData.weakAreas.map((wa) => ({
+                  id: wa.topicId,
+                  topicName: wa.topic.name,
+                  subject: wa.topic.subject,
+                  drawbackPoints: wa.drawbackPoints,
+                  priority: wa.priority,
+              }));
 
     const geminiPayload = await generateStudentRankPrediction({
         studentName: studentData.user.name,
-        targetExam: toExamTypeLabel(studentData.targetExam),
+        targetExam: targetExamLabel,
         latestPercentiles,
-        marksHistory: studentData.marks.map((mark) => ({
-            testName: mark.testName,
-            examType: toExamTypeLabel(mark.examType),
-            subject: mark.subject,
-            marksObtained: mark.marksObtained,
-            maxMarks: mark.maxMarks,
-            percentile: mark.percentile,
-            improvement: mark.improvement,
-            createdAt: mark.createdAt.toISOString(),
-        })),
-        weakAreas: studentData.weakAreas.map((wa) => ({
-            id: wa.topicId,
-            topicName: wa.topic.name,
-            subject: wa.topic.subject,
-            drawbackPoints: wa.drawbackPoints,
-            priority: wa.priority,
-        })),
+        marksHistory: testSummariesForTargetExam.map((summary, idx, allSummaries) => {
+            const previous = idx > 0 ? allSummaries[idx - 1] : null;
+            return {
+                testName: summary.testName,
+                examType: toExamTypeLabel(summary.examType),
+                totalMarksObtained: summary.totalMarks,
+                maxMarks: summary.maxMarks,
+                percentile: summary.percentile,
+                improvement: previous ? summary.totalMarks - previous.totalMarks : null,
+                testNumber: summary.index,
+            };
+        }),
+        weakAreas: weakAreasPayload,
         previousPredictions: studentData.rankPredictions.slice(0, 3).map((prediction) => ({
             examType: toExamTypeLabel(prediction.examType),
             percentile: prediction.percentile,

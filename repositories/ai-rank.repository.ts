@@ -62,6 +62,15 @@ export type StudentPredictorData = {
         improvement: number | null;
         createdAt: Date;
     }>;
+    testSummaries: Array<{
+        testName: string;
+        examType: ExamType;
+        totalMarks: number;
+        maxMarks: number;
+        percentile: number | null;
+        createdAt: Date;
+        index: number;
+    }>;
     weakAreas: Array<{
         id: string;
         topicId: string;
@@ -127,7 +136,57 @@ export async function getStudentPredictorDataByUserId(
         },
     });
 
-    return student;
+    if (!student) {
+        return null;
+    }
+
+    const groupedByTestName = new Map<
+        string,
+        {
+            testName: string;
+            examType: ExamType;
+            totalMarks: number;
+            maxMarks: number;
+            percentile: number | null;
+            createdAt: Date;
+        }
+    >();
+
+    for (const mark of student.marks) {
+        const existing = groupedByTestName.get(mark.testName);
+        if (!existing) {
+            groupedByTestName.set(mark.testName, {
+                testName: mark.testName,
+                examType: mark.examType,
+                totalMarks: mark.marksObtained,
+                maxMarks: mark.maxMarks,
+                percentile: mark.percentile,
+                createdAt: mark.createdAt,
+            });
+            continue;
+        }
+
+        existing.totalMarks += mark.marksObtained;
+        existing.maxMarks += mark.maxMarks;
+        if (existing.percentile == null && mark.percentile != null) {
+            existing.percentile = mark.percentile;
+        }
+        if (mark.createdAt.getTime() < existing.createdAt.getTime()) {
+            existing.createdAt = mark.createdAt;
+        }
+    }
+
+    const testSummaries = Array.from(groupedByTestName.values())
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .map((summary, idx) => ({
+            ...summary,
+            index: idx + 1,
+        }));
+
+    return {
+        ...student,
+        testSummaries,
+    };
 }
 
 export async function getLatestRankPrediction(

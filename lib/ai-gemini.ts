@@ -170,12 +170,11 @@ export type StudentRankPredictionInput = {
     marksHistory: Array<{
         testName: string;
         examType: "JEE" | "NEET";
-        subject: string;
-        marksObtained: number;
+        totalMarksObtained: number;
         maxMarks: number;
         percentile: number | null;
         improvement: number | null;
-        createdAt: string;
+        testNumber: number;
     }>;
     weakAreas: StudentRankWeakAreaInput[];
     previousPredictions: Array<{
@@ -213,6 +212,11 @@ export type StudentRankPredictionAIResult = {
         | "solve previous year questions";
     }>;
     overallImprovementTip: string;
+    summaryTexts: {
+        performanceSnapshot: string;
+        rankContext: string;
+        nextStepFocus: string;
+    };
     recommendationCards: {
         practice: string;
         videoOrRevision: string;
@@ -287,16 +291,24 @@ export async function generateStudentRankPrediction(
         throw new Error("Gemini client is not configured");
     }
 
+    const hasWeakAreas = input.weakAreas.length > 0;
+
     const prompt = `You are an academic performance analyst for Indian competitive exams (JEE/NEET).
 Return ONLY strict JSON — no markdown, no preamble, no trailing text.
+If fewer than 3 tests are available, explicitly state low confidence in predictions.
+Focus on trend direction (improving/declining) and negative marks pattern. If total marks are negative or near 0, flag possible guessing/accuracy issues.
 
 Student profile:
 - Name: ${input.studentName}
 - Target exam: ${input.targetExam}
 - Latest percentiles: JEE=${input.latestPercentiles.JEE ?? "N/A"}, NEET=${input.latestPercentiles.NEET ?? "N/A"}
 
-Marks history:
+Test summaries history (oldest to latest):
 ${JSON.stringify(input.marksHistory, null, 2)}
+Note: If totalMarksObtained is negative, it means the student lost more
+marks to wrong answers (negative marking penalty) than they gained from
+correct ones. This is an accuracy/attempt-strategy problem, not a data
+error. Factor this into your analysis.
 
 Weak areas:
 ${JSON.stringify(input.weakAreas, null, 2)}
@@ -319,7 +331,8 @@ Return JSON in EXACT shape:
     "p90To95": "expected rank range text"
   },
   "improvementPointsForNextBand": ["short point 1", "short point 2", "short point 3"],
-  "weakAreaRecommendations": [
+  "weakAreaRecommendations": ${hasWeakAreas
+            ? `[
     {
       "topicId": "must match input topic id",
       "topicName": "topic name",
@@ -328,8 +341,14 @@ Return JSON in EXACT shape:
       "practiceQuestionCount": 25,
       "resourceTypeSuggestion": "revise formula"
     }
-  ],
+  ]`
+            : "[]"},
   "overallImprovementTip": "2-3 sentences personalized to trend",
+  "summaryTexts": {
+    "performanceSnapshot": "1 sentence summarising trend using actual test names and percentiles",
+    "rankContext": "1 sentence explaining what the predicted rank means in real terms",
+    "nextStepFocus": "1 sentence single most impactful action the student can take right now"
+  },
   "recommendationCards": {
     "practice": "one concise recommendation",
     "videoOrRevision": "one concise recommendation",
@@ -341,7 +360,13 @@ Return JSON in EXACT shape:
 Rules:
 - trendStatus must be exactly one of: improving, stagnant, declining
 - resourceTypeSuggestion must be exactly one of: revise formula, watch video, solve previous year questions
-- Include a recommendation for every weak area topic supplied
+- Use only the provided test summaries, not subject-wise assumptions
+- ${hasWeakAreas ? "Include a recommendation for every weak area topic supplied" : "weakAreaRecommendations must be an empty array because no weak areas are provided"}
+- Use actual test names and numbers from the data, not generic placeholders
+- Keep each summaryTexts sentence under 20 words
+- performanceSnapshot must mention direction: improving, declining, or flat
+- nextStepFocus must be specific (subject or behavior), never generic like "study more"
+- If fewer than 2 tests: performanceSnapshot should note limited data honestly
 - Language must be concise, actionable, and student-friendly`;
 
     try {
@@ -386,6 +411,12 @@ Rules:
             })),
             overallImprovementTip:
                 "Live AI prediction is temporarily rate-limited. Continue regular mock tests and focused weak-area practice for steady rank improvement.",
+            summaryTexts: {
+                performanceSnapshot: "Performance data collected. Refresh prediction for AI analysis.",
+                rankContext: "Rank estimate is based on your latest percentile score.",
+                nextStepFocus:
+                    "Focus on accuracy - avoid guessing on questions you are unsure about.",
+            },
             recommendationCards: {
                 practice: "Practice 20-30 targeted questions daily from weak areas.",
                 videoOrRevision: "Use short revision videos for concepts missed repeatedly.",

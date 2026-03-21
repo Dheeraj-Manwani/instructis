@@ -101,7 +101,6 @@ export async function updateTestQuestion(
 }
 
 export async function removeQuestionFromTest(testId: string, testQuestionId: string) {
-    await mockTestRepository.getTestByIdOrThrow(testId);
     return mockTestRepository.removeQuestionFromTest(testId, testQuestionId);
 }
 
@@ -109,7 +108,6 @@ export async function reorderTestQuestions(
     testId: string,
     items: Array<{ testQuestionId: string; orderIndex: number }>
 ) {
-    await mockTestRepository.getTestByIdOrThrow(testId);
     return mockTestRepository.reorderTestQuestions(testId, items);
 }
 
@@ -150,8 +148,8 @@ export async function notifyTestAttemptResult(attemptId: string) {
     }
 
     const studentName = attempt.student.user?.name ?? "your ward";
-    const testName = attempt.mockTest.name;
-    const totalMarks = attempt.mockTest.totalMarks;
+    const testName = attempt.mockTest?.name ?? "Practice Test";
+    const totalMarks = attempt.mockTest?.totalMarks ?? 0;
     const score = attempt.totalScore ?? 0;
     const percentile = attempt.percentile ?? null;
     const cloudfrontUrl = process.env.CLOUDFRONT_URL;

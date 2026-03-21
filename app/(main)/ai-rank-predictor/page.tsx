@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { ArrowRight, RefreshCw, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, RefreshCw, Sparkles } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { toast } from "react-hot-toast";
 import { api } from "@/lib/api/axios";
@@ -17,7 +17,7 @@ type PredictorData = {
     latestImprovement: number | null;
     currentPercentile: number | null;
     currentPredictedRank: number | null;
-    performanceTrend: Array<{ testDate: string; marks: number; percentile: number | null }>;
+    performanceTrend: Array<{ label: string; marks: number; percentile: number | null }>;
     weakAreas: Array<{
         id: string;
         topicId: string;
@@ -38,6 +38,11 @@ type PredictorData = {
         percentileBandRankEstimate: { p95To99: string; p90To95: string };
         improvementPointsForNextBand: string[];
         overallImprovementTip: string;
+        summaryTexts?: {
+            performanceSnapshot: string | null;
+            rankContext: string | null;
+            nextStepFocus: string | null;
+        };
         recommendationCards: {
             practice: string;
             videoOrRevision: string;
@@ -92,10 +97,9 @@ export default function StudentAIRankPredictorPage() {
 
     const data = predictorQuery.data;
     const resolvedExamType = activeExamType ?? data?.examType ?? null;
-    const examPrediction = resolvedExamType ? data?.examPredictions[resolvedExamType] : null;
-    const currentPercentile = examPrediction?.latestPercentile ?? data?.currentPercentile ?? null;
-    const currentRank = examPrediction?.predictedRank ?? data?.currentPredictedRank ?? null;
-    const markerLeft = Math.max(0, Math.min(currentPercentile ?? 0, 100));
+    const currentPercentile = data?.currentPercentile ?? null;
+    const currentRank = data?.currentPredictedRank ?? null;
+    const markerPercentile = Math.max(0, Math.min(currentPercentile ?? 0, 100));
 
     const hasSavedPrediction = !!data?.ai;
     const hasHistory = (data?.performanceTrend?.length ?? 0) > 0;
@@ -107,18 +111,53 @@ export default function StudentAIRankPredictorPage() {
 
     const trendIcon = useMemo(() => {
         if (!data?.ai) return null;
-        if (data.ai.trendStatus === "declining") return <TrendingDown className="h-4 w-4 text-destructive" />;
-        return <TrendingUp className="h-4 w-4 text-success" />;
+        if (data.ai.trendStatus === "improving") return <span className="text-success">↗</span>;
+        if (data.ai.trendStatus === "declining") return <span className="text-destructive">↘</span>;
+        return <span className="text-warning">→</span>;
     }, [data?.ai]);
+
+    const previousPercentile = data?.performanceTrend.at(-2)?.percentile ?? null;
+    const percentileDelta =
+        currentPercentile != null && previousPercentile != null
+            ? currentPercentile - previousPercentile
+            : null;
+    const latestTestLabel = data?.performanceTrend.at(-1)?.label ?? "--";
+    const latestTotalMarksDisplay =
+        data?.latestTotalMarks != null ? data.latestTotalMarks.toFixed(1) : "--";
+    const isNegativeTotal = (data?.latestTotalMarks ?? 0) < 0;
+    const allLabelsIdentical =
+        (data?.performanceTrend.length ?? 0) > 1 &&
+        (data?.performanceTrend ?? []).every((point) => point.label === data?.performanceTrend[0]?.label);
+    const trendChartData = (data?.performanceTrend ?? []).map((point, idx) => ({
+        ...point,
+        index: idx + 1,
+        label: allLabelsIdentical ? `Test ${idx + 1}` : point.label,
+    }));
 
     if (predictorQuery.isLoading || refreshMutation.isPending) {
         return (
-            <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">Gemini is analyzing your performance...</p>
-                <Skeleton className="h-28 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-56 w-full" />
-                <Skeleton className="h-52 w-full" />
+            <div className="space-y-5">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Sparkles className="h-4 w-4 animate-pulse text-primary" />
+                    <span className="animate-pulse">Gemini is analyzing your performance...</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
+                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
+                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
+                    <Skeleton className="h-28 w-full animate-pulse rounded-xl" />
+                </div>
+                <Skeleton className="h-20 w-full animate-pulse rounded-xl" />
+                <Skeleton className="h-44 w-full animate-pulse rounded-xl" />
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.7fr_1fr]">
+                    <Skeleton className="h-64 w-full animate-pulse rounded-xl" />
+                    <div className="space-y-3">
+                        <Skeleton className="h-32 w-full animate-pulse rounded-xl" />
+                        <Skeleton className="h-24 w-full animate-pulse rounded-xl" />
+                        <Skeleton className="h-24 w-full animate-pulse rounded-xl" />
+                    </div>
+                </div>
+                <Skeleton className="h-64 w-full animate-pulse rounded-xl" />
             </div>
         );
     }
@@ -172,8 +211,14 @@ export default function StudentAIRankPredictorPage() {
                         onClick={() => refreshMutation.mutate()}
                         className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     >
-                        <RefreshCw className={cn("h-4 w-4", refreshMutation.isPending && "animate-spin")} />
-                        Refresh Prediction
+                        {data.ai ? (
+                            <RefreshCw
+                                className={cn("h-4 w-4", refreshMutation.isPending && "animate-spin")}
+                            />
+                        ) : (
+                            <Sparkles className="h-4 w-4" />
+                        )}
+                        {data.ai ? "Refresh Prediction" : "Predict metrics with Gemini"}
                     </button>
                 </div>
             </div>
@@ -183,26 +228,78 @@ export default function StudentAIRankPredictorPage() {
             )}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <StatCard title="Total Marks (Latest)" value={data.latestTotalMarks != null ? data.latestTotalMarks.toFixed(1) : "--"} />
+                <StatCard
+                    title="Total Marks (Latest Test)"
+                    value={latestTotalMarksDisplay}
+                    valueClassName={isNegativeTotal ? "text-destructive" : undefined}
+                    subLabel={
+                        <span className="flex flex-col gap-0.5">
+                            <span>{latestTestLabel}</span>
+                            {isNegativeTotal ? (
+                                <span className="text-destructive">Negative marking impacting score</span>
+                            ) : null}
+                        </span>
+                    }
+                />
                 <StatCard
                     title="Current Percentile"
                     value={currentPercentile != null ? `${currentPercentile.toFixed(2)}%` : "--"}
                     valueClassName={percentileColor(currentPercentile)}
+                    subLabel={
+                        percentileDelta != null ? (
+                            <span className={percentileDelta >= 0 ? "text-green-500" : "text-red-500"}>
+                                {percentileDelta >= 0 ? "↑" : "↓"} {Math.abs(percentileDelta).toFixed(1)}%
+                            </span>
+                        ) : (
+                            "No previous test"
+                        )
+                    }
                 />
                 <StatCard
                     title="Current Predicted Rank"
                     value={currentRank != null ? `#${currentRank.toLocaleString()}` : "--"}
                 />
                 <StatCard
-                    title="Improvement vs Last Test"
+                    title="Score Change vs Last Test"
                     value={
                         data.latestImprovement != null
-                            ? `${data.latestImprovement >= 0 ? "↑" : "↓"} ${Math.abs(data.latestImprovement).toFixed(1)}`
+                            ? `${data.latestImprovement > 0 ? "+" : ""}${data.latestImprovement.toFixed(1)}`
                             : "--"
                     }
-                    valueClassName={data.latestImprovement != null && data.latestImprovement >= 0 ? "text-success" : "text-destructive"}
+                    valueClassName={
+                        data.latestImprovement == null
+                            ? "text-muted-foreground"
+                            : data.latestImprovement > 0
+                              ? "text-success"
+                              : data.latestImprovement < 0
+                                ? "text-destructive"
+                                : "text-muted-foreground"
+                    }
                 />
             </div>
+
+            {!data.ai ? (
+                <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3">
+                    <button
+                        onClick={() => refreshMutation.mutate()}
+                        className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                        <Sparkles className="h-4 w-4" />
+                        Predict metrics with Gemini
+                    </button>
+                </div>
+            ) : null}
+
+            {data.ai?.summaryTexts?.performanceSnapshot ? (
+                <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">
+                        {data.ai.summaryTexts.performanceSnapshot}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        {data.ai.summaryTexts.rankContext}
+                    </p>
+                </div>
+            ) : null}
 
             <div className="rounded-lg border border-border bg-card p-5">
                 <h3 className="text-sm font-bold text-foreground">Percentile Band Visualization</h3>
@@ -213,7 +310,12 @@ export default function StudentAIRankPredictorPage() {
                         <div className="w-[25%] bg-amber-500" />
                         <div className="w-[25%] bg-green-700" />
                     </div>
-                    <div className="absolute -top-8" style={{ left: `${markerLeft}%`, transform: "translateX(-50%)" }}>
+                    <div
+                        className="absolute -top-8"
+                        style={{
+                            left: `clamp(8px, calc(${markerPercentile}% - 8px), calc(100% - 8px))`,
+                        }}
+                    >
                         <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold text-background">You are here</span>
                     </div>
                     <div className="mt-2 grid grid-cols-4 text-center text-[10px] text-muted-foreground">
@@ -241,46 +343,54 @@ export default function StudentAIRankPredictorPage() {
                     <div className="border-b border-border px-4 py-3">
                         <h3 className="text-sm font-bold text-foreground">Drawback Points & Recommended Practice</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/40">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Weak Area</th>
-                                    <th className="px-4 py-2 text-left">Subject</th>
-                                    <th className="px-4 py-2 text-left">Drawback Points</th>
-                                    <th className="px-4 py-2 text-left">Questions to Practice</th>
-                                    <th className="px-4 py-2 text-left">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {data.weakAreas.map((item) => (
-                                    <tr key={item.id} className="border-t border-border">
-                                        <td className="px-4 py-3 font-medium">{item.topicName}</td>
-                                        <td className="px-4 py-3">
-                                            <span className="rounded bg-muted px-2 py-0.5 text-xs">{item.subject}</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-destructive">-{item.drawbackPoints.toFixed(1)}</td>
-                                        <td className="px-4 py-3">
-                                            <button
-                                                className="inline-flex items-center gap-1 text-primary hover:underline"
-                                                onClick={() => router.push(`/practice?topicId=${item.topicId}`)}
-                                            >
-                                                {item.questionsToPractice} <ArrowRight className="h-3 w-3" />
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <button
-                                                onClick={() => router.push(`/practice?topicId=${item.topicId}`)}
-                                                className="rounded bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-                                            >
-                                                Practice Now
-                                            </button>
-                                        </td>
+                    {data.weakAreas.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+                            <BookOpen className="h-8 w-8 opacity-40" />
+                            <p className="text-sm">No weak areas identified yet.</p>
+                            <p className="text-xs">Complete more tests for the AI to detect patterns.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted/40">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">Weak Area</th>
+                                        <th className="px-4 py-2 text-left">Subject</th>
+                                        <th className="px-4 py-2 text-left">Drawback Points</th>
+                                        <th className="px-4 py-2 text-left">Questions to Practice</th>
+                                        <th className="px-4 py-2 text-left">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {data.weakAreas.map((item) => (
+                                        <tr key={item.id} className="border-t border-border">
+                                            <td className="px-4 py-3 font-medium">{item.topicName}</td>
+                                            <td className="px-4 py-3">
+                                                <span className="rounded bg-muted px-2 py-0.5 text-xs">{item.subject}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-destructive">-{item.drawbackPoints.toFixed(1)}</td>
+                                            <td className="px-4 py-3">
+                                                <button
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                    onClick={() => router.push(`/practice?topicId=${item.topicId}`)}
+                                                >
+                                                    {item.questionsToPractice} <ArrowRight className="h-3 w-3" />
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <button
+                                                    onClick={() => router.push(`/practice?topicId=${item.topicId}`)}
+                                                    className="rounded bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                                                >
+                                                    Practice Now
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-3">
@@ -290,9 +400,16 @@ export default function StudentAIRankPredictorPage() {
                             <span className="text-sm font-semibold">AI Improvement Tip</span>
                             {trendIcon}
                         </div>
-                        <p className="text-sm text-foreground">
-                            {data.ai?.overallImprovementTip ?? "Refresh prediction to get personalized suggestions."}
+                        <p className="text-sm text-muted-foreground">
+                            {data.ai?.summaryTexts?.nextStepFocus ??
+                                data.ai?.overallImprovementTip ??
+                                "Refresh prediction to get personalized suggestions."}
                         </p>
+                        {data.ai?.overallImprovementTip ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                {data.ai.overallImprovementTip}
+                            </p>
+                        ) : null}
                     </div>
                     <RecommendationCard title="Practice Recommendation" text={data.ai?.recommendationCards.practice ?? "N/A"} />
                     <RecommendationCard title="Video / Revision Recommendation" text={data.ai?.recommendationCards.videoOrRevision ?? "N/A"} />
@@ -303,12 +420,29 @@ export default function StudentAIRankPredictorPage() {
             <div className="rounded-lg border border-border bg-card p-4">
                 <h3 className="mb-3 text-sm font-bold text-foreground">Performance Trend Chart</h3>
                 <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={data.performanceTrend}>
+                    <LineChart data={trendChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="testDate" tick={{ fontSize: 10 }} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                         <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
                         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                        <Tooltip />
+                        <Tooltip
+                            formatter={(value, name) => {
+                                if (name === "marks") return [`${value}pts`, "Total"];
+                                if (name === "percentile") {
+                                    return [value != null ? `${value}%` : "N/A", "Percentile"];
+                                }
+                                return [value, name];
+                            }}
+                            labelFormatter={(label, payload) => {
+                                const point = payload?.[0]?.payload as
+                                    | { marks: number; percentile: number | null }
+                                    | undefined;
+                                if (!point) return label;
+                                const percentileText =
+                                    point.percentile != null ? `${point.percentile}%` : "N/A";
+                                return `${label} | Total: ${point.marks}pts | Percentile: ${percentileText}`;
+                            }}
+                        />
                         <Line yAxisId="left" type="monotone" dataKey="marks" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
                         <Line yAxisId="right" type="monotone" dataKey="percentile" stroke="hsl(25 95% 53%)" strokeWidth={2} dot={{ r: 3 }} />
                     </LineChart>
@@ -318,11 +452,22 @@ export default function StudentAIRankPredictorPage() {
     );
 }
 
-function StatCard({ title, value, valueClassName }: { title: string; value: string; valueClassName?: string }) {
+function StatCard({
+    title,
+    value,
+    valueClassName,
+    subLabel,
+}: {
+    title: string;
+    value: string;
+    valueClassName?: string;
+    subLabel?: ReactNode;
+}) {
     return (
         <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{title}</p>
             <p className={cn("mt-1 text-2xl font-bold font-mono text-foreground", valueClassName)}>{value}</p>
+            {subLabel ? <p className="mt-1 text-xs text-muted-foreground">{subLabel}</p> : null}
         </div>
     );
 }

@@ -11,6 +11,7 @@ import * as mockTestService from "@/services/mock-test.service";
 import * as batchService from "@/services/batch.service";
 import { parseImportedAttemptsFromWorkbook, type ImportTemplateKind } from "@/lib/utils/test-attempt-import";
 import * as markRepository from "@/repositories/mark.repository";
+import { computeAndUpsertWeakAreas } from "@/repositories/weak-area.repository";
 
 export const POST = catchAsync(async (req: NextRequest, { params }) => {
     const session = await withAuth(req);
@@ -145,6 +146,12 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
 
             return persistedAttempt;
         }, { maxWait: 10000, timeout: 20000 });
+
+        try {
+            await computeAndUpsertWeakAreas(row.studentId);
+        } catch (err) {
+            console.error("[WeakArea] Failed to compute weak areas:", err);
+        }
 
         createdOrUpdated.push(attempt);
     }

@@ -253,7 +253,7 @@ export default function TestDetailPage() {
             toast.success("Question added to test");
             queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
         },
-        onError: (e: Error) => toast.error(e.message || "Failed to add question"),
+        // onError: (e: Error) => toast.error(e.message || "Failed to add question"),
     });
 
     const updateQuestionMutation = useMutation({
@@ -776,10 +776,17 @@ export default function TestDetailPage() {
                     orderIndex: row.nextOrderIndex,
                 })),
             });
-            await queryClient.invalidateQueries({ queryKey: ["test-questions", testId] });
             toast.dismiss(loadingToastId);
             toast.success("Question order updated");
             setIsReorderModalOpen(false);
+
+            // Keep refresh non-blocking so a background refetch issue
+            // does not show a false failure toast for a successful reorder.
+            queryClient
+                .invalidateQueries({ queryKey: ["test-questions", testId] })
+                .catch(() => {
+                    toast("Order updated. Refresh to see latest list.");
+                });
         } catch (error) {
             toast.dismiss(loadingToastId);
             toast.error(error instanceof Error ? error.message : "Failed to update question order");
@@ -937,7 +944,18 @@ export default function TestDetailPage() {
                         </div>
 
                         <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
-                            {isJEE ? (
+                            {testQuestionsLoading ? (
+                                Array.from({ length: isJEE ? 4 : 5 }).map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className="rounded-lg border border-border bg-card p-3 animate-pulse space-y-2"
+                                    >
+                                        <div className="h-3 w-24 rounded bg-muted" />
+                                        <div className="h-4 w-20 rounded bg-muted" />
+                                        <div className="h-3 w-16 rounded bg-muted" />
+                                    </div>
+                                ))
+                            ) : isJEE ? (
                                 <>
                                     <StatRow label="Physics" current={syncCurrent.physics} saved={savedSubjectTotals.PHYSICS} />
                                     <StatRow

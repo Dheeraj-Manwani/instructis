@@ -112,7 +112,7 @@ export default function MyTestsPage() {
 
             {/* List */}
             {isLoading ? (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {Array.from({ length: 4 }).map((_, idx) => (
                         <Card key={idx} className="overflow-hidden">
                             <CardHeader className="pb-3">
@@ -127,7 +127,7 @@ export default function MyTestsPage() {
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {tests.map(({ test, attempt }) => {
                         const hasAttempt = attempt && attempt.totalScore !== null;
                         const percentile = hasAttempt ? getAttemptPercentile(attempt, test.totalMarks) : null;
@@ -139,47 +139,48 @@ export default function MyTestsPage() {
                             <Card
                                 key={test.id}
                                 className={cn(
-                                    "overflow-hidden border-border bg-card",
+                                    "overflow-hidden border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md",
                                     disabled && "opacity-70",
                                 )}
                             >
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                {hasAttempt ? (
-                                                    <Link
-                                                        href={`/my-tests/${attempt!.id}/analysis`}
-                                                        className="min-w-0 truncate text-base leading-snug font-medium hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm"
-                                                    >
-                                                        {test.name}
-                                                    </Link>
-                                                ) : (
-                                                    <CardTitle className="truncate text-base">{test.name}</CardTitle>
-                                                )}
-                                                {batch && (
-                                                    <Badge variant="outline" className="max-w-full truncate">
-                                                        {batch.name}
-                                                    </Badge>
-                                                )}
-                                                {batch && (
-                                                    <Badge className={cn("rounded-full", examPillClass)}>
-                                                        {batch.examType}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Clock3 className="h-3.5 w-3.5" />
-                                                    {test.duration} min
-                                                </span>{" "}
-                                                · {test.totalMarks} marks
-                                            </p>
+                                <CardHeader className="space-y-1.5 p-4 pb-2">
+                                    <div className="min-w-0 space-y-1.5">
+                                        {hasAttempt ? (
+                                            <Link
+                                                href={`/my-tests/${attempt!.id}/analysis`}
+                                                className="block min-w-0 truncate text-base leading-snug font-semibold hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm"
+                                            >
+                                                {test.name}
+                                            </Link>
+                                        ) : (
+                                            <CardTitle className="truncate text-base">{test.name}</CardTitle>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {batch && (
+                                                <Badge variant="outline" className="max-w-full truncate text-[11px] font-medium">
+                                                    {batch.name}
+                                                </Badge>
+                                            )}
+                                            {batch && (
+                                                <Badge className={cn("rounded-full text-[11px] font-semibold", examPillClass)}>
+                                                    {batch.examType}
+                                                </Badge>
+                                            )}
+                                        </div>
+
+                                        <div className="text-xs text-muted-foreground">
+                                            <span className="inline-flex items-center gap-1">
+                                                <Clock3 className="h-3 w-3" />
+                                                {test.duration} min
+                                            </span>
+                                            <span className="mx-2">·</span>
+                                            <span>{test.totalMarks} marks</span>
                                         </div>
                                     </div>
                                 </CardHeader>
 
-                                <CardContent className="space-y-3">
+                                <CardContent className="flex min-h-0 flex-col gap-3 p-4 pt-2">
                                     {!disabled && (
                                         <>
                                             <div className="flex flex-wrap gap-1.5">
@@ -196,7 +197,7 @@ export default function MyTestsPage() {
                                             </div>
 
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="font-mono text-sm font-semibold">
+                                                <span className="font-mono text-xl leading-none font-bold text-foreground">
                                                     {formatMaybeScore(attempt?.totalScore)} / {test.totalMarks}
                                                 </span>
                                                 {typeof percentile === "number" && (
@@ -214,18 +215,18 @@ export default function MyTestsPage() {
                                     )}
 
                                     {disabled && (
-                                        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
-                                            <p className="text-sm font-medium text-muted-foreground">Not Attempted</p>
+                                        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-1.5">
+                                            <p className="text-xs font-medium text-muted-foreground">Not Attempted</p>
                                         </div>
                                     )}
 
-                                    <div className="flex items-center justify-between gap-3">
+                                    <div className="mt-auto flex items-center gap-2">
                                         {disabled ? (
-                                            <Button variant="outline" disabled className="w-full sm:w-auto">
+                                            <Button variant="outline" size="sm" disabled className="w-full sm:w-fit">
                                                 View Analysis
                                             </Button>
                                         ) : (
-                                            <Button asChild className="w-full sm:w-auto">
+                                            <Button asChild size="sm" className="w-full sm:w-fit">
                                                 <Link href={`/my-tests/${attempt.id}/analysis`}>
                                                     View Analysis
                                                 </Link>
@@ -264,7 +265,7 @@ function StatBlock({
 
 function MarkPill({ label, value }: { label: string; value: number }) {
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
             <span className="text-foreground">{label}:</span>
             <span className="font-mono">{value.toFixed(1)}</span>
         </span>

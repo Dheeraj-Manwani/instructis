@@ -5,6 +5,7 @@ import { withValidation } from "@/lib/middlewares/withValidation";
 import { ApiResponse } from "@/lib/utils/api-response";
 import { testIdParamSchema, createTestAttemptBodySchema, deleteTestAttemptsBodySchema } from "@/lib/schemas/mock-test.schema";
 import * as mockTestService from "@/services/mock-test.service";
+import { computeAndUpsertWeakAreas } from "@/repositories/weak-area.repository";
 import { NextRequest } from "next/server";
 
 export const GET = catchAsync(async (req: NextRequest, { params }) => {
@@ -37,6 +38,12 @@ export const POST = catchAsync(async (req: NextRequest, { params }) => {
         percentile: body.percentile ?? null,
         submittedAt: body.submittedAt ? new Date(body.submittedAt) : null,
     });
+
+    try {
+        await computeAndUpsertWeakAreas(body.studentId);
+    } catch (err) {
+        console.error("[WeakArea] Failed to compute weak areas:", err);
+    }
 
     return ApiResponse.created(attempt, "Test attempt saved");
 });

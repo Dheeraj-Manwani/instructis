@@ -215,8 +215,10 @@ model TestAttempt {
   studentId String
   student   Student @relation(fields: [studentId], references: [id])
 
-  mockTestId String
-  mockTest   MockTest @relation(fields: [mockTestId], references: [id])
+  mockTestId        String?
+  mockTest          MockTest? @relation(fields: [mockTestId], references: [id])
+  isPracticeAttempt Boolean   @default(false)
+  practiceTopicId   String?
 
   startedAt        DateTime  @default(now())
   submittedAt      DateTime?
@@ -295,6 +297,8 @@ model WeakArea {
   questionsCount Int      @default(0)
   priority       Priority @default(HIGH)
   updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, topicId])
 }
 
 model Attendance {
