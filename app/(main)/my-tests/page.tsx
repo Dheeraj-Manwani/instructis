@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock3, FileText, Trophy } from "lucide-react";
 
 function getPercentilePillClass(percentile: number) {
-    if (percentile >= 90) return "bg-success/20 text-success border-success/30";
-    if (percentile >= 70) return "bg-warning/20 text-warning border-warning/30";
-    return "bg-destructive/20 text-destructive border-destructive/30";
+    if (percentile >= 90) return "bg-success/15 text-success border-success/30";
+    if (percentile >= 70) return "bg-warning/15 text-warning border-warning/30";
+    return "bg-destructive/15 text-destructive border-destructive/30";
 }
 
 function formatMaybeScore(score: number | null | undefined) {
@@ -67,7 +67,7 @@ export default function MyTestsPage() {
     const isJee = batch?.examType === "JEE";
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5 rounded-xl bg-muted/20 p-2 sm:p-3">
             {/* Title */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -79,18 +79,25 @@ export default function MyTestsPage() {
             </div>
 
             {/* Summary stats */}
-            <div className="rounded-lg border border-border bg-card p-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <StatBlock icon={Trophy} label="Total tests taken" value={totalTestsTaken.toString()} />
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-white shadow-sm">
+                <div className="grid grid-cols-1 divide-y divide-border/70 md:grid-cols-3 md:divide-x md:divide-y-0">
+                    <StatBlock
+                        icon={Trophy}
+                        label="Total tests taken"
+                        value={totalTestsTaken.toString()}
+                        iconClassName="bg-emerald-50 text-emerald-600"
+                    />
                     <StatBlock
                         icon={Clock3}
                         label="Average percentile"
                         value={averagePercentile === null ? "-" : `${averagePercentile.toFixed(1)}%`}
+                        iconClassName="bg-blue-50 text-blue-600"
                     />
                     <StatBlock
                         icon={FileText}
                         label="Best percentile"
                         value={bestPercentile === null ? "-" : `${bestPercentile.toFixed(1)}%`}
+                        iconClassName="bg-amber-50 text-amber-600"
                     />
                 </div>
             </div>
@@ -112,93 +119,96 @@ export default function MyTestsPage() {
 
             {/* List */}
             {isLoading ? (
-                <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {Array.from({ length: 4 }).map((_, idx) => (
-                        <Card key={idx} className="overflow-hidden">
-                            <CardHeader className="pb-3">
+                        <Card key={idx} className="overflow-hidden rounded-lg border border-border/60 bg-white shadow-sm p-1 h-fit">
+                            <CardHeader className="pb-2">
                                 <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                            <CardContent className="space-y-2.5">
+                                <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
                                 <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
-                                <div className="h-8 w-24 animate-pulse rounded bg-muted" />
+                                <div className="h-7 w-full animate-pulse rounded-md bg-muted" />
                             </CardContent>
                         </Card>
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {tests.map(({ test, attempt }) => {
                         const hasAttempt = attempt && attempt.totalScore !== null;
                         const percentile = hasAttempt ? getAttemptPercentile(attempt, test.totalMarks) : null;
                         const disabled = !hasAttempt;
+                        const subjectCount = isJee ? 3 : 4;
+                        const halfSubjectMarks = test.totalMarks > 0 ? (test.totalMarks / subjectCount) / 2 : 0;
 
-                        const examPillClass = batch?.examType === "JEE" ? "bg-jee text-white" : "bg-neet text-white";
+                        const examPillClass =
+                            batch?.examType === "JEE"
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-orange-50 text-orange-700 border-orange-200";
 
                         return (
                             <Card
                                 key={test.id}
                                 className={cn(
-                                    "overflow-hidden border-border bg-card shadow-sm transition-all hover:border-primary/20 hover:shadow-md",
-                                    disabled && "opacity-70",
+                                    "overflow-hidden rounded-lg border border-border/60 border-l-[3px] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md p-2.5 min-h-full",
+                                    hasAttempt ? "border-l-success" : "border-l-muted-foreground/40",
                                 )}
                             >
-                                <CardHeader className="space-y-1 p-3 pb-1.5">
-                                    <div className="min-w-0 space-y-1">
-                                        {hasAttempt ? (
-                                            <Link
-                                                href={`/my-tests/${attempt!.id}/analysis`}
-                                                className="block min-w-0 truncate text-[15px] leading-snug font-semibold hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm"
-                                            >
-                                                {test.name}
-                                            </Link>
-                                        ) : (
-                                            <CardTitle className="truncate text-[15px]">{test.name}</CardTitle>
+                                <CardHeader className="space-y-2 p-3 pb-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            {hasAttempt ? (
+                                                <Link
+                                                    href={`/my-tests/${attempt!.id}/analysis`}
+                                                    className="block min-w-0 truncate text-sm leading-tight font-semibold text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                                                >
+                                                    {test.name}
+                                                </Link>
+                                            ) : (
+                                                <CardTitle className="truncate text-sm leading-tight">{test.name}</CardTitle>
+                                            )}
+                                        </div>
+                                        {batch && (
+                                            <Badge className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", examPillClass)}>
+                                                {batch.examType}
+                                            </Badge>
                                         )}
+                                    </div>
 
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            {batch && (
-                                                <Badge variant="outline" className="max-w-full truncate text-[11px] font-medium">
-                                                    {batch.name}
-                                                </Badge>
-                                            )}
-                                            {batch && (
-                                                <Badge className={cn("rounded-full text-[11px] font-semibold", examPillClass)}>
-                                                    {batch.examType}
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        <div className="text-[11px] text-muted-foreground">
-                                            <span className="inline-flex items-center gap-1">
-                                                <Clock3 className="h-2.5 w-2.5" />
-                                                {test.duration} min
-                                            </span>
-                                            <span className="mx-2">·</span>
-                                            <span>{test.totalMarks} marks</span>
-                                        </div>
+                                    <div className="flex items-center gap-1.5 overflow-hidden text-[11px] text-muted-foreground">
+                                        {batch && <span className="truncate">{batch.name}</span>}
+                                        <MetaPill icon={Clock3} label={`${test.duration} min`} />
+                                        <MetaPill icon={FileText} label={`${test.totalMarks} marks`} />
                                     </div>
                                 </CardHeader>
 
-                                <CardContent className="flex min-h-0 flex-col gap-2.5 p-3 pt-1.5">
-                                    {!disabled && (
+                                <CardContent className="flex min-h-0 flex-col gap-2.5 px-3 pb-3 pt-0">
+                                    {!disabled ? (
                                         <>
-                                            <div className="flex flex-wrap gap-1">
-                                                <MarkPill label="Physics" value={attempt?.physicsMarks ?? 0} />
-                                                <MarkPill label="Chemistry" value={attempt?.chemistryMarks ?? 0} />
-                                                {isJee ? (
-                                                    <MarkPill label="Mathematics" value={attempt?.mathematicsMarks ?? 0} />
-                                                ) : (
-                                                    <>
-                                                        <MarkPill label="Zoology" value={attempt?.zoologyMarks ?? 0} />
-                                                        <MarkPill label="Botany" value={attempt?.botanyMarks ?? 0} />
-                                                    </>
-                                                )}
+                                            <div className="border-t border-border/70 pt-2">
+                                                <div className="flex items-center gap-1 overflow-x-auto">
+                                                    <MarkPill label="Phy" value={attempt?.physicsMarks ?? 0} halfSubjectMarks={halfSubjectMarks} />
+                                                    <MarkPill label="Chem" value={attempt?.chemistryMarks ?? 0} halfSubjectMarks={halfSubjectMarks} />
+                                                    {isJee ? (
+                                                        <MarkPill
+                                                            label="Math"
+                                                            value={attempt?.mathematicsMarks ?? 0}
+                                                            halfSubjectMarks={halfSubjectMarks}
+                                                        />
+                                                    ) : (
+                                                        <>
+                                                            <MarkPill label="Zoo" value={attempt?.zoologyMarks ?? 0} halfSubjectMarks={halfSubjectMarks} />
+                                                            <MarkPill label="Bot" value={attempt?.botanyMarks ?? 0} halfSubjectMarks={halfSubjectMarks} />
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-1.5">
+                                            <div className="flex items-center justify-between gap-2">
                                                 <span className="font-mono text-lg leading-none font-bold text-foreground">
-                                                    {formatMaybeScore(attempt?.totalScore)} / {test.totalMarks}
+                                                    {formatMaybeScore(attempt?.totalScore)}{" "}
+                                                    <span className="text-sm text-muted-foreground">/ {test.totalMarks}</span>
                                                 </span>
                                                 {typeof percentile === "number" && (
                                                     <span
@@ -211,28 +221,18 @@ export default function MyTestsPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                        </>
-                                    )}
 
-                                    {disabled && (
-                                        <div className="rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5">
-                                            <p className="text-[11px] font-medium text-muted-foreground">Not Attempted</p>
-                                        </div>
-                                    )}
-
-                                    <div className="mt-auto flex items-center gap-2">
-                                        {disabled ? (
-                                            <Button variant="outline" size="sm" disabled className="h-7 w-full px-2.5 text-xs sm:w-fit">
-                                                View Analysis
-                                            </Button>
-                                        ) : (
-                                            <Button asChild size="sm" className="h-7 w-full px-2.5 text-xs sm:w-fit">
+                                            <Button asChild className="mt-0.5 h-8 w-full rounded-md bg-success text-xs text-success-foreground hover:bg-success/90">
                                                 <Link href={`/my-tests/${attempt.id}/analysis`}>
-                                                    View Analysis
+                                                    View Analysis →
                                                 </Link>
                                             </Button>
-                                        )}
-                                    </div>
+                                        </>
+                                    ) : (
+                                        <div className="my-auto rounded-md border border-dashed border-border/70 bg-muted/20 px-2.5 py-3 text-center">
+                                            <p className="text-xs text-muted-foreground italic">Not Attempted</p>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         );
@@ -247,27 +247,56 @@ function StatBlock({
     icon: Icon,
     label,
     value,
+    iconClassName,
 }: {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     value: string;
+    iconClassName?: string;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-            <Icon className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2.5 px-3 py-2">
+            <div className={cn("flex h-6 w-6 items-center justify-center rounded-md", iconClassName)}>
+                <Icon className="h-3.5 w-3.5" />
+            </div>
             <div className="space-y-0.5">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="text-sm font-bold font-mono text-foreground">{value}</p>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="text-base leading-none font-bold font-mono text-foreground">{value}</p>
             </div>
         </div>
     );
 }
 
-function MarkPill({ label, value }: { label: string; value: number }) {
+function MetaPill({
+    icon: Icon,
+    label,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+}) {
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            <span className="text-foreground">{label}:</span>
-            <span className="font-mono">{value.toFixed(1)}</span>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <Icon className="h-2.5 w-2.5" />
+            <span>{label}</span>
+        </span>
+    );
+}
+
+function MarkPill({
+    label,
+    value,
+    halfSubjectMarks,
+}: {
+    label: string;
+    value: number;
+    halfSubjectMarks: number;
+}) {
+    const valueClass = value > halfSubjectMarks ? "text-success" : "text-destructive";
+
+    return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-muted/20 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span>{label}</span>
+            <span className={cn("font-mono font-semibold", valueClass)}>{value.toFixed(1)}</span>
         </span>
     );
 }
