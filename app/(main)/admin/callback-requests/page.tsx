@@ -77,6 +77,7 @@ export default function CallbackRequestsAdminPage() {
 
   const [statusById, setStatusById] = useState<Record<string, CallbackStatus>>({});
   const [noteById, setNoteById] = useState<Record<string, string>>({});
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -191,6 +192,8 @@ export default function CallbackRequestsAdminPage() {
                   const draftStatus = statusById[r.id] ?? r.status;
                   const draftNote = noteById[r.id] ?? r.adminNote ?? "";
                   const badge = getStatusBadge(draftStatus);
+                  const isCurrentRowSaving =
+                    updateMutation.isPending && savingRowId === r.id;
 
                   return (
                     <TableRow key={r.id}>
@@ -236,15 +239,23 @@ export default function CallbackRequestsAdminPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <LoadingButton
-                          loading={updateMutation.isPending}
+                          loading={isCurrentRowSaving}
                           onClick={() => {
                             const adminNote =
                               draftNote.trim().length > 0 ? draftNote.trim() : null;
-                            updateMutation.mutate({
-                              id: r.id,
-                              status: draftStatus,
-                              adminNote,
-                            });
+                            setSavingRowId(r.id);
+                            updateMutation.mutate(
+                              {
+                                id: r.id,
+                                status: draftStatus,
+                                adminNote,
+                              },
+                              {
+                                onSettled: () => {
+                                  setSavingRowId(null);
+                                },
+                              },
+                            );
                           }}
                           className="ml-auto"
                         >

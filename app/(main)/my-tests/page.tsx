@@ -17,6 +17,12 @@ function getPercentilePillClass(percentile: number) {
     return "bg-destructive/15 text-destructive border-destructive/30";
 }
 
+function getExamPillClass(examType?: string) {
+    return examType === "JEE"
+        ? "bg-jee/15 text-jee border-jee/30"
+        : "bg-neet/15 text-neet border-neet/30";
+}
+
 function formatMaybeScore(score: number | null | undefined) {
     if (score === null || score === undefined) return "-";
     const rounded = Math.round(score);
@@ -79,25 +85,25 @@ export default function MyTestsPage() {
             </div>
 
             {/* Summary stats */}
-            <div className="overflow-hidden rounded-xl border border-border/60 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
                 <div className="grid grid-cols-1 divide-y divide-border/70 md:grid-cols-3 md:divide-x md:divide-y-0">
                     <StatBlock
                         icon={Trophy}
                         label="Total tests taken"
                         value={totalTestsTaken.toString()}
-                        iconClassName="bg-emerald-50 text-emerald-600"
+                        iconClassName="bg-success/15 text-success"
                     />
                     <StatBlock
                         icon={Clock3}
                         label="Average percentile"
                         value={averagePercentile === null ? "-" : `${averagePercentile.toFixed(1)}%`}
-                        iconClassName="bg-blue-50 text-blue-600"
+                        iconClassName="bg-jee/15 text-jee"
                     />
                     <StatBlock
                         icon={FileText}
                         label="Best percentile"
                         value={bestPercentile === null ? "-" : `${bestPercentile.toFixed(1)}%`}
-                        iconClassName="bg-amber-50 text-amber-600"
+                        iconClassName="bg-warning/15 text-warning"
                     />
                 </div>
             </div>
@@ -121,7 +127,7 @@ export default function MyTestsPage() {
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {Array.from({ length: 4 }).map((_, idx) => (
-                        <Card key={idx} className="overflow-hidden rounded-lg border border-border/60 bg-white shadow-sm p-1 h-fit">
+                        <Card key={idx} className="overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm p-1 h-fit">
                             <CardHeader className="pb-2">
                                 <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
                             </CardHeader>
@@ -142,16 +148,13 @@ export default function MyTestsPage() {
                         const subjectCount = isJee ? 3 : 4;
                         const halfSubjectMarks = test.totalMarks > 0 ? (test.totalMarks / subjectCount) / 2 : 0;
 
-                        const examPillClass =
-                            batch?.examType === "JEE"
-                                ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : "bg-orange-50 text-orange-700 border-orange-200";
+                        const examPillClass = getExamPillClass(batch?.examType);
 
                         return (
                             <Card
                                 key={test.id}
                                 className={cn(
-                                    "overflow-hidden rounded-lg border border-border/60 border-l-[3px] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md p-2.5 min-h-full",
+                                    "overflow-hidden rounded-lg border border-border/60 border-l-[3px] bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md p-2.5 min-h-full",
                                     hasAttempt ? "border-l-success" : "border-l-muted-foreground/40",
                                 )}
                             >

@@ -12,6 +12,12 @@ import prisma from "./prisma";
 import { passwordSchema } from "./schemas/auth.schema";
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL,
+  trustedOrigins: [
+    "https://instructis.in",
+    "https://www.instructis.in",
+    "http://localhost:3000",
+  ],
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
