@@ -89,6 +89,7 @@ model Student {
   address     String?
   dob         DateTime?
 
+  assignmentSubmissions AssignmentSubmission[]
   marks           Mark[]
   testAttempts    TestAttempt[]
   weakAreas       WeakArea[]
@@ -104,6 +105,9 @@ model Faculty {
   title      String?
   department String?
 
+  classSessions ClassSession[]
+  assignments Assignment[]
+
   questions Question[]
   mockTests MockTest[]
   marks     Mark[]         @relation("FacultyMarks")
@@ -117,6 +121,9 @@ model Batch {
   year      Int
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  classSessions ClassSession[]
+  assignments Assignment[]
 
   students  Student[]
   faculties BatchFaculty[]
@@ -137,6 +144,7 @@ model Topic {
   name    String
   subject SubjectEnum
 
+  assignments Assignment[]
   questions Question[]
   weakAreas WeakArea[]
 }
@@ -301,16 +309,6 @@ model WeakArea {
   @@unique([studentId, topicId])
 }
 
-model Attendance {
-  id        String   @id @default(cuid())
-  studentId String
-  student   Student  @relation(fields: [studentId], references: [id])
-  date      DateTime
-  isPresent Boolean  @default(true)
-  subject   String?
-  createdAt DateTime @default(now())
-}
-
 model Notification {
   id        String           @id @default(cuid())
   userId    String
@@ -332,6 +330,119 @@ model WhatsAppLog {
   status      String
   sentAt      DateTime @default(now())
   metadata    Json?
+}
+
+enum CallbackStatus {
+  PENDING
+  CALLED
+  CONVERTED
+  NOT_INTERESTED
+}
+
+enum CourseMode {
+  ONLINE
+  CLASSROOM
+  HYBRID
+}
+
+
+
+model CallbackRequest {
+  id             String         @id @default(cuid())
+  fullName       String
+  mobileNumber   String
+  courseMode     CourseMode?
+  examType       ExamType?
+  status         CallbackStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime       @default(now())
+  calledAt       DateTime?
+}
+
+model ClassSession {
+  id        String      @id @default(cuid())
+  batchId   String
+  batch     Batch       @relation(fields: [batchId], references: [id])
+  facultyId String
+  faculty   Faculty     @relation(fields: [facultyId], references: [id])
+  subject   SubjectEnum
+  topic     String?
+  date      DateTime
+  startTime DateTime?
+  endTime   DateTime?
+  notes     String?
+  createdAt DateTime    @default(now())
+
+  attendances Attendance[]
+}
+
+// Replace your existing Attendance model with this:
+model Attendance {
+  id             String       @id @default(cuid())
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id])
+  classSessionId String
+  classSession   ClassSession @relation(fields: [classSessionId], references: [id])
+  isPresent      Boolean      @default(true)
+  note           String?      // "Left early", "Medical", etc.
+  createdAt      DateTime     @default(now())
+
+  @@unique([studentId, classSessionId])  // one record per student per class
+  @@index([studentId])
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  LATE
+  GRADED
+}
+
+model Assignment {
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  subject     SubjectEnum
+  topicId     String?
+  topic       Topic?           @relation(fields: [topicId], references: [id])
+  batchId     String
+  batch       Batch            @relation(fields: [batchId], references: [id])
+  facultyId   String
+  faculty     Faculty          @relation(fields: [facultyId], references: [id])
+  status      AssignmentStatus @default(DRAFT)
+  dueDate     DateTime?
+  maxMarks    Float?
+  attachmentUrl String?        // optional PDF/link the faculty shares
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String           @id @default(cuid())
+  assignmentId String
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id])
+  studentId    String
+  student      Student          @relation(fields: [studentId], references: [id])
+  status       SubmissionStatus @default(PENDING)
+  note         String?          // student's submission note
+  attachmentUrl String?         // student's submitted file/link
+  marksAwarded  Float?
+  feedback      String?         // faculty feedback after grading
+  submittedAt   DateTime?
+  gradedAt      DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@unique([assignmentId, studentId])  // one submission per student per assignment
+  @@index([studentId])
+  @@index([assignmentId])
 }
 
 // auth specific models

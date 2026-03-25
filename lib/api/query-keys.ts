@@ -1,4 +1,10 @@
 export const queryKeys = {
+    callbackRequests: {
+        all: ["callback-requests"] as const,
+        list: (params?: Record<string, unknown>) =>
+            [...queryKeys.callbackRequests.all, "list", params ?? {}] as const,
+    },
+
     students: {
         all: ["students"] as const,
         lists: () => [...queryKeys.students.all, "list"] as const,

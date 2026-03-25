@@ -6,12 +6,20 @@ import { motion, useInView, animate } from "motion/react";
 import {
   ArrowRight, Play, CheckCircle2, Upload, Brain, Search, MessageSquare,
   FileText, BarChart3, Star, Twitter, Linkedin, MessageCircle, ChevronRight,
-  School, GraduationCap, Smartphone, Trophy, Sparkles, Menu, X
+  School, GraduationCap, Smartphone, Trophy, Sparkles, Menu, X, Rocket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import appLogo from "@/assets/logo.png";
+import { toast } from "react-hot-toast";
+import LoadingButton from "@/components/LoadingButton";
+import { createCallbackRequest } from "@/lib/api/callback-requests";
+import TopResultsCarousel from "@/components/TopResultsCarousel";
+import MeetOurStarsCarousel from "@/components/MeetOurStarsCarousel";
+import TestimonialsCarousel from "@/components/TestimonialsCarousel";
+import CallbackFloatingPhoneButton from "@/components/CallbackFloatingPhoneButton";
 
 /* ─── helpers ─── */
 function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -71,6 +79,8 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
+      <TopResultsCarousel />
+      <CallbackFloatingPhoneButton />
       {/* ════════ NAVBAR ════════ */}
       <nav
         className={cn(
@@ -323,6 +333,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ════════ COACHING HIGHLIGHTS ════════ */}
+      <LandingCoachingHighlights />
+
       {/* ════════ STATS BAR ════════ */}
       <SectionWrap className="bg-slate-900 py-14">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -539,13 +552,19 @@ export default function LandingPage() {
         </div>
       </SectionWrap>
 
+      <MeetOurStarsCarousel />
+      <TestimonialsCarousel />
+
+      {/* ════════ REQUEST A CALLBACK ════════ */}
+      <CallbackRequestSection />
+
       {/* ════════ FOOTER ════════ */}
-      <footer className="bg-slate-950 text-slate-400 py-16">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-10 mb-12">
-            <div className="md:col-span-1">
+      <footer className="bg-slate-950 text-slate-300 border-t border-slate-800 py-16">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid gap-10 md:grid-cols-5 items-start mb-12">
+            <div className="md:col-span-2">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-slate-900/60 flex items-center justify-center overflow-hidden border border-slate-800">
                   <Image
                     src={appLogo}
                     alt="Instructis"
@@ -554,39 +573,388 @@ export default function LandingPage() {
                 </div>
                 <span className="text-lg font-extrabold text-white">Instructis</span>
               </div>
-              <p className="text-sm leading-relaxed">Smarter coaching. Better results.</p>
+              <p className="text-sm leading-relaxed max-w-md">
+                Smarter coaching workflows for JEE & NEET institutes — upload marks, predict ranks, analyze performance, and keep parents informed.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a
+                  href="#callback"
+                  className="inline-flex items-center rounded-full border border-emerald-700/30 bg-emerald-700/10 px-5 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-700/15 transition-colors"
+                >
+                  Request a callback
+                </a>
+                <Link
+                  href="/batches"
+                  className="inline-flex items-center rounded-full border border-slate-800 bg-slate-900/40 px-5 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-900/60 transition-colors"
+                >
+                  Go to Dashboard
+                </Link>
+              </div>
             </div>
+
             <div>
               <h4 className="text-sm font-semibold text-white mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+                <li>
+                  <a href="#features" className="hover:text-white transition-colors">
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a href="#institutes" className="hover:text-white transition-colors">
+                    AI Rank Predictor
+                  </a>
+                </li>
+                <li>
+                  <a href="#callback" className="hover:text-white transition-colors">
+                    Book a Demo
+                  </a>
+                </li>
               </ul>
             </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-white mb-4">Company</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    About Us
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Careers
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Press
+                  </a>
+                </li>
+              </ul>
+            </div>
+
             <div>
               <h4 className="text-sm font-semibold text-white mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Help Center
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Privacy Policy
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Terms of Service
+                  </a>
+                </li>
               </ul>
             </div>
+
             <div>
               <h4 className="text-sm font-semibold text-white mb-4">Connect</h4>
-              <div className="flex gap-3">
-                <a href="#" className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"><Twitter className="w-4 h-4" /></a>
-                <a href="#" className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"><Linkedin className="w-4 h-4" /></a>
-                <a href="#" className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"><MessageCircle className="w-4 h-4" /></a>
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href="#"
+                  aria-label="Twitter"
+                  className="w-10 h-10 rounded-xl bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800 flex items-center justify-center transition-colors"
+                >
+                  <Twitter className="w-4 h-4 text-slate-200" />
+                </a>
+                <a
+                  href="#"
+                  aria-label="LinkedIn"
+                  className="w-10 h-10 rounded-xl bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800 flex items-center justify-center transition-colors"
+                >
+                  <Linkedin className="w-4 h-4 text-slate-200" />
+                </a>
+                <a
+                  href="#"
+                  aria-label="Chat"
+                  className="w-10 h-10 rounded-xl bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800 flex items-center justify-center transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4 text-slate-200" />
+                </a>
+              </div>
+
+              <div className="mt-6 text-sm">
+                <p className="text-white font-semibold mb-2">Contact</p>
+                <p className="text-slate-400">
+                  Email: <a className="text-emerald-200 hover:text-white transition-colors" href="#">support@instructis.com</a>
+                </p>
+                <p className="text-slate-400 mt-1">
+                  Phone:{" "}
+                  <a className="text-emerald-200 hover:text-white transition-colors" href="tel:+911234567890">
+                    +91 12345 67890
+                  </a>
+                </p>
               </div>
             </div>
           </div>
-          <div className="border-t border-slate-800 pt-8 text-center text-xs">
-            © 2025 Instructis. Built for JEE & NEET coaching institutes in India.
+
+          <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+            <span>© 2025 Instructis. Built for JEE & NEET coaching institutes in India.</span>
+            <div className="flex gap-5">
+              <a href="#" className="hover:text-white transition-colors">
+                Sitemap
+              </a>
+              <a href="#callback" className="hover:text-white transition-colors">
+                Request callback
+              </a>
+            </div>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function CallbackRequestSection() {
+  const PHONE_NUMBER = "+9195153736499";
+  const [step, setStep] = useState<1 | 2>(1);
+  const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [courseMode, setCourseMode] = useState<"ONLINE" | "CLASSROOM" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const canSubmit =
+    fullName.trim().length >= 2 &&
+    /^[0-9]{10,15}$/.test(mobileNumber.trim()) &&
+    courseMode != null;
+
+  async function handleSubmit() {
+    if (!canSubmit) {
+      toast.error("Please enter your name, mobile number, and select course mode.");
+      return;
+    }
+    if (courseMode == null) return;
+
+    setIsSubmitting(true);
+    try {
+      await createCallbackRequest({
+        fullName: fullName.trim(),
+        mobileNumber: mobileNumber.trim(),
+        courseMode,
+      });
+      toast.success("Request submitted! We'll call you shortly.");
+      setStep(2);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to submit request.";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <SectionWrap id="callback" className="py-24 bg-white">
+      <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+        {/* left */}
+        <div className="space-y-6">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+            <Rocket className="w-7 h-7 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight">Request a callback</h2>
+            <p className="text-sm text-slate-500 mt-2">
+              Or{" "}
+              <a
+                href={`tel:${PHONE_NUMBER}`}
+                className="text-emerald-700 font-semibold hover:underline"
+              >
+                call {PHONE_NUMBER}
+              </a>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <div className="h-2 flex-1 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full"
+                  style={{ width: step === 1 ? "50%" : "100%" }}
+                />
+              </div>
+              <div className="text-sm font-semibold text-slate-700 w-10 text-right">
+                {step}/2
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">Step {step} of 2</p>
+          </div>
+        </div>
+
+        {/* right */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-7">
+          {step === 1 ? (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Full Name
+                </label>
+                <Input
+                  value={fullName}
+                  placeholder="Narendra Modi"
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="h-12 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Mobile Number
+                </label>
+                <Input
+                  value={mobileNumber}
+                  placeholder="1234123412"
+                  inputMode="numeric"
+                  onChange={(e) => setMobileNumber(e.target.value)}
+                  className="h-12 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-slate-700">
+                  Course Mode:
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCourseMode("ONLINE")}
+                    className={cn(
+                      "px-6 py-3 rounded-xl border text-sm font-semibold transition-colors",
+                      courseMode === "ONLINE"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Online
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCourseMode("CLASSROOM")}
+                    className={cn(
+                      "px-6 py-3 rounded-xl border text-sm font-semibold transition-colors",
+                      courseMode === "CLASSROOM"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Classroom
+                  </button>
+                </div>
+              </div>
+
+              <LoadingButton
+                loading={isSubmitting}
+                disabled={!canSubmit || isSubmitting}
+                onClick={handleSubmit}
+                className="w-full h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              >
+                Let&apos;s get started
+              </LoadingButton>
+            </div>
+          ) : (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                <Rocket className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-extrabold">
+                Thanks! We&apos;ll reach out soon.
+              </h3>
+              <p className="text-sm text-slate-500">
+                Your callback request has been saved. An institute representative will contact you shortly.
+              </p>
+              <div className="flex justify-center">
+                <Link href="/batches">
+                  <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </SectionWrap>
+  );
+}
+
+function LandingCoachingHighlights() {
+  const cards = [
+    {
+      title: "24/7 AI Study Partner – MyAakash App",
+      desc: "Instant doubt-solving and analytics for a competitive edge",
+      img: "https://picsum.photos/seed/my-aakash-app/900/700",
+    },
+    {
+      title: "Mastery Through Structured Learning",
+      desc: "A powerful system built to crack school and competitive exams with precision",
+      img: "https://picsum.photos/seed/structured-learning/900/700",
+    },
+    {
+      title: "Smarter Learning With Smart Tech",
+      desc: "Immersive AV modules and QR-powered videos that make tough concepts easy",
+      img: "https://picsum.photos/seed/smart-tech/900/700",
+    },
+    {
+      title: "Next-Gen Hybrid Classrooms",
+      desc: "Dynamic smart classrooms blending offline and online for a richer experience",
+      img: "https://picsum.photos/seed/hybrid-classrooms/900/700",
+    },
+  ];
+
+  return (
+    <SectionWrap className="py-24 bg-white">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-14">
+          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
+            India&apos;s Best Coaching for{" "}
+            <span className="text-sky-500">NEET</span>,{" "}
+            <span className="text-sky-500">JEE</span> &amp;{" "}
+            <span className="text-sky-500">FOUNDATIONS</span>
+          </h2>
+          <p className="mt-5 text-slate-600 max-w-3xl mx-auto text-base md:text-lg">
+            Experience the unique blend of pedagogy, practice, and personalized
+            mentorship
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          {cards.map((c) => (
+            <motion.div
+              key={c.title}
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+              className="bg-[#EAF4FF] border border-[#D6E6FF] rounded-3xl overflow-hidden"
+            >
+              <div className="p-8 md:p-10 text-center space-y-5">
+                <h3 className="text-xl md:text-2xl font-extrabold text-slate-900">
+                  {c.title}
+                </h3>
+                <p className="text-slate-600 leading-relaxed text-base md:text-lg max-w-md mx-auto">
+                  {c.desc}
+                </p>
+                <div className="mx-auto w-full max-w-md">
+                  <img
+                    src={c.img}
+                    alt=""
+                    className="w-full h-[220px] md:h-[240px] object-contain rounded-2xl bg-white"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </SectionWrap>
   );
 }
 

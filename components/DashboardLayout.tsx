@@ -19,6 +19,8 @@ import {
   FileText,
   LogOutIcon,
   LucideIcon,
+  CalendarCheck,
+  ClipboardList,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -56,15 +58,20 @@ const allNavItems: NavItem[] = [
   { title: "My Batches", path: "/my-batches", icon: Users, roles: [RoleEnum.FACULTY] },
   { title: "Topics", path: "/topics", icon: BookOpen, roles: [RoleEnum.FACULTY] },
   { title: "Questions", path: "/questions", icon: PenTool, roles: [RoleEnum.FACULTY] },
+  { title: "Attendance", path: "/faculty/attendance", icon: CalendarCheck, roles: [RoleEnum.FACULTY] },
+  { title: "Assignments", path: "/faculty/assignments", icon: ClipboardList, roles: [RoleEnum.FACULTY] },
 
   // existing student items
   { title: "My Tests", path: "/my-tests", icon: FileText, roles: [RoleEnum.STUDENT] },
   { title: "AI Rank Predictor", path: "/ai-rank-predictor", icon: Brain, roles: [RoleEnum.STUDENT] },
   { title: "Practice", path: "/practice", icon: BookOpen, roles: [RoleEnum.STUDENT] },
+  { title: "Attendance", path: "/student/attendance", icon: CalendarCheck, roles: [RoleEnum.STUDENT] },
+  { title: "Assignments", path: "/student/assignments", icon: ClipboardList, roles: [RoleEnum.STUDENT] },
 
   // existing admin items
   { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
   { title: "User Management", path: "/admin/users", icon: ShieldCheck, roles: [RoleEnum.ADMIN] },
+  { title: "Callback Requests", path: "/admin/callback-requests", icon: MessageCircle, roles: [RoleEnum.ADMIN] },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -88,6 +95,7 @@ const pageTitles: Record<string, string> = {
   // admin pages
   "/batches": "Batches",
   "/admin/users": "User Management",
+  "/admin/callback-requests": "Callback Requests",
 };
 
 // Helper function to get page title from pathname
