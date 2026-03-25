@@ -136,3 +136,21 @@ export async function gradeSubmission(
   return res.data;
 }
 
+export async function uploadAssignmentAttachment(file: File): Promise<{
+  objectKey: string;
+  url: string;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = (await api.post("/assignments/upload-attachment", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })) as {
+    data: {
+      objectKey: string;
+      url: string;
+    };
+  };
+  return res.data;
+}
+

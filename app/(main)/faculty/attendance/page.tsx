@@ -490,7 +490,7 @@ export default function FacultyAttendancePage() {
 
       <Dialog open={detailOpen} onOpenChange={(o) => setDetailOpen(o)}>
         <DialogContent
-          className="max-w-2xl w-full right-0 left-auto top-0 translate-x-0 translate-y-0 rounded-l-none"
+          className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto"
         >
           <DialogHeader className="space-y-1">
             <DialogTitle>Session Attendance</DialogTitle>

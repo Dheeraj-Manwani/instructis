@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { useBreadcrumb } from "@/store/BreadcrumbContext";
 import { getProfile } from "@/lib/api/profile";
-import { fetchAssignments, submitAssignment } from "@/lib/api/assignments";
+import { fetchAssignments, submitAssignment, uploadAssignmentAttachment } from "@/lib/api/assignments";
 import type { StudentAssignmentListItem } from "@/lib/api/assignments";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +180,15 @@ export default function StudentAssignmentsPage() {
     onError: (e: Error) => toast.error(e.message || "Failed to submit"),
   });
 
+  const uploadSubmitAttachmentMutation = useMutation({
+    mutationFn: async (file: File) => uploadAssignmentAttachment(file),
+    onSuccess: ({ url }) => {
+      setSubmitAttachmentUrl(url);
+      toast.success("Attachment uploaded");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to upload attachment"),
+  });
+
   const openSubmit = (a: StudentAssignmentListItem) => {
     setActiveAssignment(a);
     setSubmitNote("");
@@ -336,8 +345,30 @@ export default function StudentAssignmentsPage() {
               </div>
 
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment URL (optional)</p>
-                <Input value={submitAttachmentUrl} onChange={(e) => setSubmitAttachmentUrl(e.target.value)} placeholder="https://..." />
+                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment (optional)</p>
+                <Input
+                  type="file"
+                  accept="*/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    uploadSubmitAttachmentMutation.mutate(file);
+                    e.currentTarget.value = "";
+                  }}
+                  disabled={uploadSubmitAttachmentMutation.isPending || submitMutation.isPending}
+                />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {uploadSubmitAttachmentMutation.isPending
+                    ? "Uploading..."
+                    : "Upload a file or paste a direct link below."}
+                </p>
+                <Input
+                  className="mt-2"
+                  value={submitAttachmentUrl}
+                  onChange={(e) => setSubmitAttachmentUrl(e.target.value)}
+                  placeholder="https://..."
+                  disabled={submitMutation.isPending}
+                />
               </div>
 
               <div>
@@ -356,8 +387,9 @@ export default function StudentAssignmentsPage() {
                   Cancel
                 </Button>
                 <LoadingButton
-                  loading={submitMutation.isPending}
+                  loading={submitMutation.isPending || uploadSubmitAttachmentMutation.isPending}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={uploadSubmitAttachmentMutation.isPending}
                   onClick={() => submitMutation.mutate()}
                 >
                   Submit

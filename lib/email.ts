@@ -18,7 +18,7 @@ interface SendEmailValues {
 
 export async function sendEmail({ to, subject, html }: SendEmailValues) {
   await resend.emails.send({
-    from: "portfolio@updates.bydm.site",
+    from: "no-reply@instructis.in",
     to,
     subject,
     html,
@@ -164,14 +164,13 @@ export function getParentNotificationEmailHtml(options: {
               <h2 style="margin: 0 0 10px; font-size: 20px; color: ${BRAND.text};">${escapeHtml(title)}</h2>
               <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.textMuted};">${escapeHtml(greeting)}</p>
               ${safeLines
-                .map(
-                  (line) =>
-                    `<p style="margin: 0 0 10px; font-size: 14px; color: ${BRAND.text}; line-height: 1.6;">${line}</p>`
-                )
-                .join("")}
-              ${
-                shouldShowCta
-                  ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin-top: 20px;">
+      .map(
+        (line) =>
+          `<p style="margin: 0 0 10px; font-size: 14px; color: ${BRAND.text}; line-height: 1.6;">${line}</p>`
+      )
+      .join("")}
+              ${shouldShowCta
+      ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin-top: 20px;">
                        <tr>
                          <td style="background: ${BRAND.primary}; border-radius: 8px;">
                            <a href="${escapeHtml(ctaUrl as string)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding: 12px 20px; color:#ffffff; text-decoration:none; font-weight:600; font-size:14px;">
@@ -180,8 +179,8 @@ export function getParentNotificationEmailHtml(options: {
                          </td>
                        </tr>
                      </table>`
-                  : ""
-              }
+      : ""
+    }
             </td>
           </tr>
           <tr>

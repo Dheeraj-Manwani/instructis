@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
+import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
+import "swiper/css/free-mode";
 import { Sparkles, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -152,10 +153,18 @@ export default function MeetOurStarsCarousel() {
         </div>
 
         <Swiper
-          modules={[Navigation]}
+          modules={[Navigation, Autoplay, FreeMode]}
           navigation
           loop
+          freeMode={{ enabled: true, momentum: false }}
+          autoplay={{
+            delay: 0,
+            disableOnInteraction: false,
+            pauseOnMouseEnter: true,
+          }}
+          speed={4500}
           spaceBetween={18}
+          className="meetStarsSwiper"
           breakpoints={{
             0: { slidesPerView: 1.1 },
             640: { slidesPerView: 2.2 },
@@ -200,6 +209,12 @@ export default function MeetOurStarsCarousel() {
           ))}
         </Swiper>
       </div>
+
+      <style jsx global>{`
+        .meetStarsSwiper .swiper-wrapper {
+          transition-timing-function: linear !important;
+        }
+      `}</style>
     </section>
   );
 }

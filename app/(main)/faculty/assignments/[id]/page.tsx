@@ -25,6 +25,7 @@ import {
   gradeSubmission,
   updateAssignment,
   deleteAssignment,
+  uploadAssignmentAttachment,
   type AssignmentDetailForFaculty,
   type AssignmentSubmissionRow,
 } from "@/lib/api/assignments";
@@ -32,6 +33,7 @@ import { fetchTopicsBySubject } from "@/lib/api/topics";
 
 const SUBJECTS = ["PHYSICS", "CHEMISTRY", "MATHEMATICS", "ZOOLOGY", "BOTANY"] as const;
 type Subject = (typeof SUBJECTS)[number];
+const CLEAR_TOPIC_VALUE = "__NONE__";
 
 function subjectBarClass(subject: Subject) {
   switch (subject) {
@@ -158,6 +160,15 @@ export default function FacultyAssignmentDetailPage() {
       });
     },
     onError: (e: Error) => toast.error(e.message || "Failed to update assignment"),
+  });
+
+  const uploadEditAttachmentMutation = useMutation({
+    mutationFn: async (file: File) => uploadAssignmentAttachment(file),
+    onSuccess: ({ url }) => {
+      setEditAttachmentUrl(url);
+      toast.success("Attachment uploaded");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to upload attachment"),
   });
 
   const publishCloseMutation = useMutation({
@@ -499,12 +510,15 @@ export default function FacultyAssignmentDetailPage() {
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Topic (optional)</p>
-                <Select value={editTopicId} onValueChange={setEditTopicId}>
+                <Select
+                  value={editTopicId}
+                  onValueChange={(value) => setEditTopicId(value === CLEAR_TOPIC_VALUE ? "" : value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select topic (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value={CLEAR_TOPIC_VALUE}>None</SelectItem>
                     {topics.map((t: { id: string; name: string }) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -531,8 +545,30 @@ export default function FacultyAssignmentDetailPage() {
                 <Input type="number" value={editMaxMarks} onChange={(e) => setEditMaxMarks(e.target.value)} min={0} placeholder="e.g. 50" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment URL</p>
-                <Input value={editAttachmentUrl} onChange={(e) => setEditAttachmentUrl(e.target.value)} placeholder="https://..." />
+                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment</p>
+                <Input
+                  type="file"
+                  accept="*/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    uploadEditAttachmentMutation.mutate(file);
+                    e.currentTarget.value = "";
+                  }}
+                  disabled={uploadEditAttachmentMutation.isPending || updateMutation.isPending}
+                />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {uploadEditAttachmentMutation.isPending
+                    ? "Uploading..."
+                    : "Upload a file or paste a direct link below."}
+                </p>
+                <Input
+                  className="mt-2"
+                  value={editAttachmentUrl}
+                  onChange={(e) => setEditAttachmentUrl(e.target.value)}
+                  placeholder="https://..."
+                  disabled={updateMutation.isPending}
+                />
               </div>
             </div>
           )}
@@ -542,8 +578,9 @@ export default function FacultyAssignmentDetailPage() {
               Cancel
             </Button>
             <LoadingButton
-              loading={updateMutation.isPending}
+              loading={updateMutation.isPending || uploadEditAttachmentMutation.isPending}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={uploadEditAttachmentMutation.isPending}
               onClick={() => {
                 const maxMarksNumber = editMaxMarks.trim().length ? Number(editMaxMarks) : undefined;
                 const dueDate = editDueDateLocal.trim().length ? editDueDateLocal : undefined;

@@ -31,43 +31,41 @@ function getColorForAttendance(percentage: number) {
 }
 
 function CircularProgress({
-  value,
   percentage,
 }: {
-  value: number;
   percentage: number;
 }) {
-  const radius = 18;
+  const radius = 24;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percentage / 100) * circumference;
 
   const color = getColorForAttendance(percentage);
   return (
     <div className="relative inline-flex items-center justify-center">
-      <svg width="48" height="48" viewBox="0 0 48 48" className="transform -rotate-90">
+      <svg width="64" height="64" viewBox="0 0 64 64" className="transform -rotate-90">
         <circle
-          cx="24"
-          cy="24"
+          cx="32"
+          cy="32"
           r={radius}
           stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth="4"
+          className="text-muted-foreground/30"
+          strokeWidth="6"
           fill="none"
         />
         <circle
-          cx="24"
-          cy="24"
+          cx="32"
+          cy="32"
           r={radius}
           className={color.stroke}
           stroke="currentColor"
-          strokeWidth="4"
+          strokeWidth="6"
           fill="none"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute text-sm font-semibold">{Math.round(value)}%</span>
+      <span className="absolute text-sm font-semibold">{Math.round(percentage)}%</span>
     </div>
   );
 }
@@ -146,22 +144,21 @@ export default function StudentAttendancePage() {
                   {subjectSummary.map((s) => {
                     const color = getColorForAttendance(s.percentage);
                     return (
-                      <div key={s.subject} className="min-w-[220px] rounded-lg border border-border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{getSubjectLabel(s.subject)}</p>
-                            <div className="mt-2">
-                              <CircularProgress value={s.percentage} percentage={s.percentage} />
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant="secondary" className={color.bg}>
-                              {s.present} / {s.total}
-                            </Badge>
-                            {s.percentage < 75 && (
-                              <p className="mt-2 text-xs font-medium text-destructive">⚠️ Below required attendance</p>
-                            )}
-                          </div>
+                      <div key={s.subject} className="min-w-[240px] rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold">{getSubjectLabel(s.subject)}</p>
+                          <Badge variant="secondary" className={color.bg}>
+                            {s.present}/{s.total} sessions
+                          </Badge>
+                        </div>
+                        <div className="mt-4 flex flex-col items-center">
+                          <CircularProgress percentage={s.percentage} />
+                          <p className="mt-2 text-xs text-muted-foreground">Attendance rate</p>
+                        </div>
+                        <div className="mt-3 min-h-4 text-center">
+                          {s.percentage < 75 && (
+                            <p className="text-xs font-medium text-destructive">Below required attendance</p>
+                          )}
                         </div>
                       </div>
                     );

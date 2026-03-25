@@ -13,6 +13,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import appLogo from "@/assets/logo.png";
+import fullDayImage from "@/assets/landing/4cards/fullday.webp";
+import structuredLearningImage from "@/assets/landing/4cards/Structured_learning.webp";
+import smartLearningImage from "@/assets/landing/4cards/Smart_Learning.webp";
+import nextGenHybridImage from "@/assets/landing/4cards/Nextgen_Hybrid.webp";
 import { toast } from "react-hot-toast";
 import LoadingButton from "@/components/LoadingButton";
 import { createCallbackRequest } from "@/lib/api/callback-requests";
@@ -20,24 +24,26 @@ import TopResultsCarousel from "@/components/TopResultsCarousel";
 import MeetOurStarsCarousel from "@/components/MeetOurStarsCarousel";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import CallbackFloatingPhoneButton from "@/components/CallbackFloatingPhoneButton";
+import { ModeToggle } from "@/components/ModeToggle";
+import { useRouter } from "next/navigation";
 
 /* ─── helpers ─── */
-function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
-  useEffect(() => {
-    if (!inView || !ref.current) return;
-    const ctrl = animate(0, target, {
-      duration: 2,
-      ease: "easeOut",
-      onUpdate: (v) => {
-        if (ref.current) ref.current.textContent = Math.floor(v).toLocaleString("en-IN") + suffix;
-      },
-    });
-    return () => ctrl.stop();
-  }, [inView, target, suffix]);
-  return <span ref={ref}>0{suffix}</span>;
-}
+// function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
+//   const ref = useRef<HTMLSpanElement>(null);
+//   const inView = useInView(ref, { once: true, margin: "-40px" });
+//   useEffect(() => {
+//     if (!inView || !ref.current) return;
+//     const ctrl = animate(0, target, {
+//       duration: 2,
+//       ease: "easeOut",
+//       onUpdate: (v) => {
+//         if (ref.current) ref.current.textContent = Math.floor(v).toLocaleString("en-IN") + suffix;
+//       },
+//     });
+//     return () => ctrl.stop();
+//   }, [inView, target, suffix]);
+//   return <span ref={ref}>0{suffix}</span>;
+// }
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
 const fadeUp = {
@@ -70,6 +76,7 @@ function SectionWrap({ children, className, id }: { children: React.ReactNode; c
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 20);
@@ -78,14 +85,16 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans overflow-x-hidden">
       <TopResultsCarousel />
       <CallbackFloatingPhoneButton />
       {/* ════════ NAVBAR ════════ */}
       <nav
         className={cn(
           "fixed top-0 inset-x-0 z-50 border-b border-border transition-all duration-300",
-          scrolled ? "bg-background/90 backdrop-blur-xl shadow-lg shadow-black/5" : "bg-background/80"
+          scrolled
+            ? "bg-white/90 backdrop-blur-xl shadow-lg shadow-black/5 dark:bg-slate-950/90 dark:border-slate-800"
+            : "bg-white/80 dark:bg-slate-950/80 dark:border-slate-800"
         )}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
@@ -97,49 +106,57 @@ export default function LandingPage() {
                 className="h-8 w-8 object-contain"
               />
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-foreground">Instructis</span>
+            <span className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Instructis</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8">
-            <a
+          <div className="hidden md:flex items-center gap-2">
+            {/* <a
               href="#features"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
               Features
             </a>
             <a
               href="#institutes"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
               For Institutes
             </a>
             <a
               href="#pricing"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
               Pricing
-            </a>
+            </a> */}
             <Link href="/batches">
-              <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-105 transition-all duration-300">
+              <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-105 transition-all duration-300">
                 Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
+            <ModeToggle />
+
           </div>
 
-          <button className="md:hidden p-2" onClick={() => setMobileNav(!mobileNav)}>
-            {mobileNav ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <ModeToggle />
+            <button className="p-2" onClick={() => setMobileNav(!mobileNav)}>
+              {mobileNav ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
 
         {mobileNav && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="md:hidden bg-white border-t px-6 py-4 flex flex-col gap-4"
+            className="md:hidden bg-white border-t px-6 py-4 flex flex-col gap-4 text-slate-900 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-800"
           >
             <a href="#features" onClick={() => setMobileNav(false)} className="text-sm font-medium">Features</a>
             <a href="#institutes" onClick={() => setMobileNav(false)} className="text-sm font-medium">For Institutes</a>
             <a href="#pricing" onClick={() => setMobileNav(false)} className="text-sm font-medium">Pricing</a>
+            <div className="pt-1">
+              <ModeToggle />
+            </div>
             <Link href="/batches" onClick={() => setMobileNav(false)}>
               <Button className="rounded-full bg-emerald-600 text-white w-full">Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" /></Button>
             </Link>
@@ -148,8 +165,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ════════ HERO ════════ */}
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
-        {/* mesh gradient bg */}
+      {/* <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
         <div className="absolute inset-0 -z-10 pointer-events-none">
           <div className="absolute top-0 left-0 w-[520px] h-[520px] rounded-full bg-emerald-500/10 blur-[120px]" />
           <div className="absolute top-20 right-0 w-[480px] h-[480px] rounded-full bg-blue-500/10 blur-[120px]" />
@@ -157,7 +173,6 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-5 gap-12 items-center">
-          {/* left */}
           <div className="lg:col-span-3 space-y-8">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -270,7 +285,6 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          {/* right – dashboard mockup */}
           <motion.div
             initial={{ opacity: 0, x: 40, rotate: -2 }}
             animate={{ opacity: 1, x: 0, rotate: -2 }}
@@ -307,7 +321,6 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* floating badges */}
             <motion.div
               animate={{ y: [0, -8, 0] }}
               transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
@@ -331,13 +344,13 @@ export default function LandingPage() {
             </motion.div>
           </motion.div>
         </div>
-      </section>
+      </section> */}
 
       {/* ════════ COACHING HIGHLIGHTS ════════ */}
       <LandingCoachingHighlights />
 
       {/* ════════ STATS BAR ════════ */}
-      <SectionWrap className="bg-slate-900 py-14">
+      {/* <SectionWrap className="bg-slate-900 py-14">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {[
             { icon: School, label: "Coaching Institutes", value: 500, suffix: "+" },
@@ -354,44 +367,8 @@ export default function LandingPage() {
             </motion.div>
           ))}
         </div>
-      </SectionWrap>
+      </SectionWrap> */}
 
-      {/* ════════ FEATURES ════════ */}
-      <SectionWrap id="features" className="py-24 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-6">
-          <motion.div variants={fadeUp} className="text-center mb-16">
-            <span className="text-sm font-semibold text-emerald-600 uppercase tracking-wider">Features</span>
-            <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight">Everything Your Institute Needs</h2>
-            <p className="mt-4 text-slate-500 max-w-2xl mx-auto">One platform to manage marks, predict ranks, analyze performance, and keep parents informed.</p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { icon: Upload, title: "Bulk Marks Upload", desc: "Import from Excel or Google Sheets in seconds. Auto-calculate percentiles instantly.", color: "from-emerald-500 to-emerald-600" },
-              { icon: Brain, title: "AI Rank Predictor", desc: "Predict JEE & NEET ranks using AI. Show students exactly where they stand and what to improve.", color: "from-blue-500 to-blue-600" },
-              { icon: Search, title: "Per-Question Analysis", desc: "See which questions each student got wrong, with AI-generated explanations and correct solutions.", color: "from-violet-500 to-violet-600" },
-              { icon: MessageSquare, title: "WhatsApp Notifications", desc: "Auto-send beautiful report cards to parents via WhatsApp the moment marks are saved.", color: "from-emerald-500 to-teal-600" },
-              { icon: FileText, title: "Question Builder", desc: "Rich-text question creation with difficulty levels and explanations — built for JEE/NEET.", color: "from-amber-500 to-orange-500" },
-              { icon: BarChart3, title: "Performance Analytics", desc: "Track weak areas, improvement trends, and percentile bands for every student over time.", color: "from-pink-500 to-rose-500" },
-            ].map((f, i) => (
-              <motion.div
-                key={f.title}
-                variants={fadeUp}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-shadow duration-300 group relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))` }}>
-                </div>
-                <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg", f.color)} style={{ boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15)" }}>
-                  <f.icon className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-lg font-bold mb-2">{f.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </SectionWrap>
 
       {/* ════════ AI RANK PREDICTOR SHOWCASE ════════ */}
       <SectionWrap id="institutes" className="py-24 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -428,13 +405,51 @@ export default function LandingPage() {
         </div>
       </SectionWrap>
 
+      {/* ════════ FEATURES ════════ */}
+      <SectionWrap id="features" className="py-24 bg-slate-50 dark:bg-slate-900/40">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div variants={fadeUp} className="text-center mb-16">
+            <span className="text-sm font-semibold text-emerald-600 uppercase tracking-wider">Why Choose Us</span>
+            <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight">A Learning Experience Built for JEE/NEET Results</h2>
+            <p className="mt-4 text-slate-500 dark:text-slate-300 max-w-2xl mx-auto">From structured preparation to personal attention, we help every student improve steadily with full parent confidence.</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { icon: Upload, title: "Structured Test & Practice Routine", desc: "Regular tests and planned revision keep preparation disciplined and exam-ready throughout the year.", color: "from-emerald-500 to-emerald-600" },
+              { icon: Brain, title: "Realistic Rank Guidance", desc: "Students know where they stand now and what score range to target next in JEE/NEET.", color: "from-blue-500 to-blue-600" },
+              { icon: Search, title: "Detailed Error Analysis", desc: "Every test is reviewed question by question so weak concepts are fixed quickly and confidently.", color: "from-violet-500 to-violet-600" },
+              { icon: MessageSquare, title: "Transparent Parent Updates", desc: "Parents receive timely progress reports and action points to support focused study at home.", color: "from-emerald-500 to-teal-600" },
+              { icon: FileText, title: "JEE/NEET-Focused Practice Material", desc: "Curated chapter-wise questions by difficulty build speed, accuracy, and strong exam temperament.", color: "from-amber-500 to-orange-500" },
+              { icon: BarChart3, title: "Continuous Performance Improvement", desc: "Progress tracking reveals growth areas early so each student improves with a clear personal plan.", color: "from-pink-500 to-rose-500" },
+            ].map((f, i) => (
+              <motion.div
+                key={f.title}
+                variants={fadeUp}
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-700 p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-black/30 transition-shadow duration-300 group relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))` }}>
+                </div>
+                <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg", f.color)} style={{ boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15)" }}>
+                  <f.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">{f.title}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-300 leading-relaxed">{f.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </SectionWrap>
+
+
       {/* ════════ WHATSAPP SECTION ════════ */}
       <SectionWrap className="py-24 bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-900 text-white">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <motion.div variants={fadeUp}>
-            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Parents Stay Informed. Always.</h2>
+            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Parents Get Complete Performance Reports Instantly on WhatsApp</h2>
             <p className="text-emerald-200 max-w-xl mx-auto mb-12">
-              The moment marks are uploaded, parents receive a beautiful WhatsApp report card with JEE/NEET results, rank predictions, and focus areas.
+              The moment marks are uploaded, parents automatically receive a detailed PDF report on WhatsApp with AI insights, JEE/NEET rank prediction, performance breakdown, and clear focus areas for improvement.
             </p>
           </motion.div>
 
@@ -451,7 +466,12 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4 mt-12">
-            {["📤 Auto-sent on Mark Upload", "📊 Includes Rank Prediction", "🎯 Focus Areas Highlighted"].map((p) => (
+            {[
+              "📄 Detailed PDF report card auto-delivered",
+              "🧠 AI insights + rank prediction",
+              "🎯 Clear chapter-wise focus areas",
+              "✅ Parents stay updated without asking",
+            ].map((p) => (
               <span key={p} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-5 py-2 text-sm font-medium">{p}</span>
             ))}
           </motion.div>
@@ -459,7 +479,7 @@ export default function LandingPage() {
       </SectionWrap>
 
       {/* ════════ HOW IT WORKS ════════ */}
-      <SectionWrap className="py-24 bg-slate-50">
+      {/* <SectionWrap className="py-24 bg-slate-50">
         <div className="max-w-5xl mx-auto px-6">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">How It Works</h2>
@@ -467,7 +487,6 @@ export default function LandingPage() {
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8 relative">
-            {/* connecting line */}
             <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-[2px] border-t-2 border-dashed border-slate-300" />
 
             {[
@@ -486,39 +505,58 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
-      </SectionWrap>
+      </SectionWrap> */}
 
       {/* ════════ TESTIMONIALS ════════ */}
-      <SectionWrap className="py-24 bg-white">
+      <SectionWrap className="py-24 bg-white dark:bg-slate-950">
         <div className="max-w-6xl mx-auto px-6">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Loved by Faculty Across India</h2>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Trusted by Parents Across India</h2>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: "Ravi Verma", role: "HOD Physics, Apex Coaching, Kota", quote: "Instructis saved us 3 hours per test cycle. Parents love the WhatsApp reports and students take their weak areas seriously now." },
-              { name: "Dr. Meena Sharma", role: "Director, Pinnacle Institute, Delhi", quote: "The AI rank predictor is shockingly accurate. Our students improved by 15 percentile points on average last semester." },
-              { name: "Arjun Nair", role: "Faculty, Elite Academy, Hyderabad", quote: "Question analysis with step-by-step explanations means I spend less time correcting and more time teaching. Game changer." },
+              {
+                name: "Neha Sharma",
+                relation: "Parent of Aarav Sharma",
+                city: "Kota",
+                quote:
+                  "The WhatsApp report card comes right after every test, so we always know where Aarav stands. It clearly shows strengths and weak chapters, which helps us support him better.",
+              },
+              {
+                name: "Rajiv Menon",
+                relation: "Parent of Diya Menon",
+                city: "Hyderabad",
+                quote:
+                  "I can see Diya's progress without chasing updates. The rank trend and improvement tips make everything easy to understand, and we feel reassured about her preparation.",
+              },
+              {
+                name: "Pooja Gupta",
+                relation: "Parent of Rishabh Gupta",
+                city: "Delhi",
+                quote:
+                  "What I value most is transparency. We get timely updates, clear performance snapshots, and better communication with teachers, so there are no surprises before exams.",
+              },
             ].map((t, i) => (
               <motion.div
                 key={t.name}
                 variants={fadeUp}
-                className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm hover:shadow-lg dark:hover:shadow-black/30 transition-shadow"
               >
                 <div className="flex gap-1 mb-4">
                   {Array.from({ length: 5 }).map((_, j) => (
                     <Star key={j} className="w-4 h-4 text-amber-400" fill="currentColor" />
                   ))}
                 </div>
-                <p className="text-slate-600 text-sm leading-relaxed mb-6">&quot;{t.quote}&quot;</p>
+                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-6">&quot;{t.quote}&quot;</p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
                     {t.name.split(" ").map(w => w[0]).join("")}
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{t.name}</p>
-                    <p className="text-xs text-slate-400">{t.role}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-300">{t.relation}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-400">{t.city}</p>
                   </div>
                 </div>
               </motion.div>
@@ -535,15 +573,19 @@ export default function LandingPage() {
         </div>
         <div className="max-w-3xl mx-auto px-6 text-center relative z-10">
           <motion.div variants={fadeUp}>
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-5">Ready to Transform Your Coaching Institute?</h2>
-            <p className="text-slate-400 mb-10 text-lg">Join 500+ institutes using Instructis to track, predict, and improve student performance.</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-5">Ready to Transform Your Coaching Experience?</h2>
+            <p className="text-slate-400 mb-10 text-lg">Join 500+ institutes using Instructis to view marks, predict ranks, analyze performance, and keep parents informed.</p>
             <div className="flex flex-wrap justify-center gap-4 mb-8">
               <Link href="/batches">
                 <Button size="lg" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-10 h-13 text-base shadow-xl shadow-emerald-600/30 hover:shadow-emerald-600/50 hover:scale-105 transition-all duration-300">
                   Go to Dashboard <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="rounded-full px-10 h-13 text-base border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white">
+              <Button
+                size="lg"
+                onClick={() => router.push("#callback")}
+                className="rounded-full px-10 h-13 text-base bg-transparent border border-white/35 text-white hover:bg-white/10 hover:border-white/60"
+              >
                 Book a Demo
               </Button>
             </div>
@@ -551,9 +593,9 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </SectionWrap>
-
+      {/* 
       <MeetOurStarsCarousel />
-      <TestimonialsCarousel />
+      <TestimonialsCarousel /> */}
 
       {/* ════════ REQUEST A CALLBACK ════════ */}
       <CallbackRequestSection />
@@ -574,7 +616,7 @@ export default function LandingPage() {
                 <span className="text-lg font-extrabold text-white">Instructis</span>
               </div>
               <p className="text-sm leading-relaxed max-w-md">
-                Smarter coaching workflows for JEE & NEET institutes — upload marks, predict ranks, analyze performance, and keep parents informed.
+                Smarter coaching workflows for JEE & NEET institutes — view marks, predict ranks, analyze performance, and keep parents informed.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -716,7 +758,7 @@ export default function LandingPage() {
 
 function CallbackRequestSection() {
   const PHONE_NUMBER = "+9195153736499";
-  const [step, setStep] = useState<1 | 2>(1);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [fullName, setFullName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [courseMode, setCourseMode] = useState<"ONLINE" | "CLASSROOM" | null>(null);
@@ -729,7 +771,7 @@ function CallbackRequestSection() {
 
   async function handleSubmit() {
     if (!canSubmit) {
-      toast.error("Please enter your name, mobile number, and select course mode.");
+      toast.error("Please fill all fields to request counselling.");
       return;
     }
     if (courseMode == null) return;
@@ -741,8 +783,8 @@ function CallbackRequestSection() {
         mobileNumber: mobileNumber.trim(),
         courseMode,
       });
-      toast.success("Request submitted! We'll call you shortly.");
-      setStep(2);
+      toast.success("Request submitted! Our admission counsellor will call you shortly.");
+      setIsSubmitted(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to submit request.";
       toast.error(message);
@@ -752,74 +794,92 @@ function CallbackRequestSection() {
   }
 
   return (
-    <SectionWrap id="callback" className="py-24 bg-white">
+    <SectionWrap id="callback" className="py-24 bg-linear-to-b from-white to-emerald-50/40 dark:from-slate-950 dark:to-slate-900/60">
       <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
         {/* left */}
         <div className="space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <Rocket className="w-7 h-7 text-emerald-600" />
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-sm">
+            <GraduationCap className="w-7 h-7 text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-3xl font-extrabold tracking-tight">Request a callback</h2>
-            <p className="text-sm text-slate-500 mt-2">
-              Or{" "}
-              <a
-                href={`tel:${PHONE_NUMBER}`}
-                className="text-emerald-700 font-semibold hover:underline"
-              >
-                call {PHONE_NUMBER}
-              </a>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+              Get Personal JEE/NEET Counselling & Admission Guidance
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300 mt-3 max-w-xl">
+              Speak with an academic expert to get the right preparation path, clear next steps,
+              and support for your child&apos;s exam journey.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-4">
-              <div className="h-2 flex-1 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full"
-                  style={{ width: step === 1 ? "50%" : "100%" }}
-                />
-              </div>
-              <div className="text-sm font-semibold text-slate-700 w-10 text-right">
-                {step}/2
-              </div>
-            </div>
-            <p className="text-xs text-slate-500">Step {step} of 2</p>
+          <div className="flex flex-wrap gap-3">
+            {[
+              "Free counselling",
+              "No obligation",
+              "Guidance for JEE/NEET preparation",
+            ].map((item) => (
+              <span
+                key={item}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-900/30 dark:text-emerald-200"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                {item}
+              </span>
+            ))}
           </div>
+
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Prefer to talk now?{" "}
+            <a
+              href={`tel:${PHONE_NUMBER}`}
+              className="text-emerald-700 font-semibold hover:underline"
+            >
+              Call {PHONE_NUMBER}
+            </a>
+          </p>
         </div>
 
         {/* right */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-7">
-          {step === 1 ? (
-            <div className="space-y-6">
+        <div className="bg-white dark:bg-slate-900 border-2 border-emerald-100 dark:border-emerald-900/50 rounded-3xl p-7 shadow-xl shadow-emerald-100/60 dark:shadow-black/40">
+          {!isSubmitted ? (
+            <div className="space-y-5">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Request a Callback</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quick form - takes less than 30 seconds.</p>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
-                  Full Name
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Student Name
                 </label>
                 <Input
                   value={fullName}
-                  placeholder="Narendra Modi"
+                  placeholder="Enter student name"
                   onChange={(e) => setFullName(e.target.value)}
                   className="h-12 rounded-xl"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Mobile Number
                 </label>
                 <Input
                   value={mobileNumber}
-                  placeholder="1234123412"
+                  placeholder="Enter parent/student mobile number"
                   inputMode="numeric"
                   onChange={(e) => setMobileNumber(e.target.value)}
                   className="h-12 rounded-xl"
                 />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  We respect your privacy. Your number is used only for counselling support.
+                </p>
               </div>
 
+
+
               <div className="space-y-3">
-                <label className="text-sm font-semibold text-slate-700">
-                  Course Mode:
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Course Mode
                 </label>
                 <div className="flex gap-3">
                   <button
@@ -829,7 +889,7 @@ function CallbackRequestSection() {
                       "px-6 py-3 rounded-xl border text-sm font-semibold transition-colors",
                       courseMode === "ONLINE"
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     )}
                   >
                     Online
@@ -841,7 +901,7 @@ function CallbackRequestSection() {
                       "px-6 py-3 rounded-xl border text-sm font-semibold transition-colors",
                       courseMode === "CLASSROOM"
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     )}
                   >
                     Classroom
@@ -855,7 +915,7 @@ function CallbackRequestSection() {
                 onClick={handleSubmit}
                 className="w-full h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
               >
-                Let&apos;s get started
+                Get Free Counselling
               </LoadingButton>
             </div>
           ) : (
@@ -864,17 +924,23 @@ function CallbackRequestSection() {
                 <Rocket className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-extrabold">
-                Thanks! We&apos;ll reach out soon.
+                Thank you! Our team will call you shortly.
               </h3>
-              <p className="text-sm text-slate-500">
-                Your callback request has been saved. An institute representative will contact you shortly.
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Your counselling request is confirmed. We will guide you with the best next steps for JEE/NEET preparation and admissions.
               </p>
               <div className="flex justify-center">
-                <Link href="/batches">
-                  <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8">
-                    Go to Dashboard
-                  </Button>
-                </Link>
+                <Button
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setFullName("");
+                    setMobileNumber("");
+                    setCourseMode(null);
+                  }}
+                  className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-8"
+                >
+                  Submit Another Request
+                </Button>
               </div>
             </div>
           )}
@@ -887,38 +953,38 @@ function CallbackRequestSection() {
 function LandingCoachingHighlights() {
   const cards = [
     {
-      title: "24/7 AI Study Partner – MyAakash App",
-      desc: "Instant doubt-solving and analytics for a competitive edge",
-      img: "https://picsum.photos/seed/my-aakash-app/900/700",
+      title: "24/7 AI Study Partner",
+      desc: "24 access and ai analysis for a competitive edge",
+      img: fullDayImage,
     },
     {
       title: "Mastery Through Structured Learning",
       desc: "A powerful system built to crack school and competitive exams with precision",
-      img: "https://picsum.photos/seed/structured-learning/900/700",
+      img: structuredLearningImage,
     },
     {
       title: "Smarter Learning With Smart Tech",
       desc: "Immersive AV modules and QR-powered videos that make tough concepts easy",
-      img: "https://picsum.photos/seed/smart-tech/900/700",
+      img: smartLearningImage,
     },
     {
       title: "Next-Gen Hybrid Classrooms",
       desc: "Dynamic smart classrooms blending offline and online for a richer experience",
-      img: "https://picsum.photos/seed/hybrid-classrooms/900/700",
+      img: nextGenHybridImage,
     },
   ];
 
   return (
-    <SectionWrap className="py-24 bg-white">
+    <SectionWrap className="py-24 bg-white dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-14">
-          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
+          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
             India&apos;s Best Coaching for{" "}
             <span className="text-sky-500">NEET</span>,{" "}
             <span className="text-sky-500">JEE</span> &amp;{" "}
             <span className="text-sky-500">FOUNDATIONS</span>
           </h2>
-          <p className="mt-5 text-slate-600 max-w-3xl mx-auto text-base md:text-lg">
+          <p className="mt-5 text-slate-600 dark:text-slate-300 max-w-3xl mx-auto text-base md:text-lg">
             Experience the unique blend of pedagogy, practice, and personalized
             mentorship
           </p>
@@ -932,21 +998,22 @@ function LandingCoachingHighlights() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-40px" }}
-              className="bg-[#EAF4FF] border border-[#D6E6FF] rounded-3xl overflow-hidden"
+              className="bg-[#EAF4FF] border border-[#D6E6FF] dark:bg-slate-900 dark:border-slate-700 rounded-3xl overflow-hidden"
             >
               <div className="p-8 md:p-10 text-center space-y-5">
-                <h3 className="text-xl md:text-2xl font-extrabold text-slate-900">
+                <h3 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-100">
                   {c.title}
                 </h3>
-                <p className="text-slate-600 leading-relaxed text-base md:text-lg max-w-md mx-auto">
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-base md:text-lg max-w-md mx-auto">
                   {c.desc}
                 </p>
                 <div className="mx-auto w-full max-w-md">
-                  <img
+                  <Image
                     src={c.img}
-                    alt=""
-                    className="w-full h-[220px] md:h-[240px] object-contain rounded-2xl bg-white"
-                    loading="lazy"
+                    alt={c.title}
+                    width={900}
+                    height={700}
+                    className="w-full h-[220px] md:h-[240px] object-contain rounded-2xl bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
@@ -1011,34 +1078,37 @@ function PhoneMockup() {
     <div className="w-[280px] bg-slate-900 rounded-[2.5rem] p-3 shadow-2xl shadow-black/30 border border-slate-700">
       <div className="bg-white rounded-[2rem] overflow-hidden">
         {/* status bar */}
-        <div className="bg-emerald-700 text-white px-4 py-2 flex items-center justify-between text-[10px]">
-          <span className="font-semibold">Instructis</span>
-          <span className="opacity-60">WhatsApp</span>
+        <div className="bg-[#075E54] text-white px-4 py-2 flex items-center justify-between text-[10px]">
+          <span className="font-semibold">Parent Updates</span>
+          <span className="opacity-80">WhatsApp</span>
         </div>
         {/* chat */}
         <div className="bg-[#ECE5DD] p-3 space-y-2 min-h-[320px]">
           <div className="bg-white rounded-lg p-3 shadow-sm max-w-[220px] space-y-2">
-            <p className="text-[10px] font-bold text-slate-800">📊 Instructis Report Card</p>
+            <p className="text-[10px] font-bold text-slate-800">📎 JEE/NEET Performance Report (PDF)</p>
             <p className="text-[10px] text-slate-600">Student: <b>Rahul Sharma</b></p>
-            <div className="flex gap-2">
-              <div className="flex-1 bg-blue-50 border border-blue-200 rounded-md p-1.5 text-center">
-                <p className="text-[9px] text-blue-600 font-semibold">JEE</p>
-                <p className="text-sm font-extrabold text-blue-700">92.5%</p>
-              </div>
-              <div className="flex-1 bg-orange-50 border border-orange-200 rounded-md p-1.5 text-center">
-                <p className="text-[9px] text-orange-600 font-semibold">NEET</p>
-                <p className="text-sm font-extrabold text-orange-700">88.2%</p>
+            <div className="border border-slate-200 rounded-md bg-slate-50 p-2">
+              <p className="text-[8px] uppercase tracking-wide text-slate-500 font-semibold">PDF Preview</p>
+              <div className="mt-1 grid grid-cols-2 gap-1.5">
+                <div className="bg-white border border-blue-200 rounded p-1.5 text-center">
+                  <p className="text-[8px] text-blue-600 font-semibold">Predicted Rank</p>
+                  <p className="text-[11px] font-extrabold text-blue-700">JEE: AIR 2,140</p>
+                </div>
+                <div className="bg-white border border-orange-200 rounded p-1.5 text-center">
+                  <p className="text-[8px] text-orange-600 font-semibold">Percentile</p>
+                  <p className="text-[11px] font-extrabold text-orange-700">NEET: 94.2</p>
+                </div>
               </div>
             </div>
-            <p className="text-[9px] text-emerald-700 font-semibold">📈 Improvement: +12 Points</p>
-            <p className="text-[9px] text-slate-500">Focus: Thermodynamics, Electrostatics</p>
+            <p className="text-[9px] text-emerald-700 font-semibold">🧠 AI Insight: Strong in Chemistry, needs speed in Physics numericals.</p>
+            <p className="text-[9px] text-slate-500">🎯 Focus Areas: Thermodynamics, Electrostatics, Biological Classification</p>
             <div className="flex gap-1.5">
-              <span className="text-[8px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">Practice Now</span>
-              <span className="text-[8px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">View Full Report</span>
+              <span className="text-[8px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">Auto-sent after marks upload</span>
+              <span className="text-[8px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">View detailed PDF</span>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-[9px] text-slate-400">10:32 AM ✓✓</span>
+            <span className="text-[9px] text-slate-400">10:32 AM ✓✓ Delivered</span>
           </div>
         </div>
       </div>

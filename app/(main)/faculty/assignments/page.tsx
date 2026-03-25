@@ -41,6 +41,7 @@ import {
   createAssignment,
   updateAssignment,
   deleteAssignment,
+  uploadAssignmentAttachment,
   type AssignmentListItem,
 } from "@/lib/api/assignments";
 import {
@@ -49,6 +50,7 @@ import {
 
 const SUBJECTS = ["PHYSICS", "CHEMISTRY", "MATHEMATICS", "ZOOLOGY", "BOTANY"] as const;
 type Subject = (typeof SUBJECTS)[number];
+const CLEAR_TOPIC_VALUE = "__NONE__";
 
 function subjectBarClass(subject: Subject) {
   switch (subject) {
@@ -190,6 +192,15 @@ export default function FacultyAssignmentsPage() {
       });
     },
     onError: (e: Error) => toast.error(e.message || "Failed to create assignment"),
+  });
+
+  const uploadCreateAttachmentMutation = useMutation({
+    mutationFn: async (file: File) => uploadAssignmentAttachment(file),
+    onSuccess: ({ url }) => {
+      setAttachmentUrl(url);
+      toast.success("Attachment uploaded");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to upload attachment"),
   });
 
   const publishCloseMutation = useMutation({
@@ -411,7 +422,7 @@ export default function FacultyAssignmentsPage() {
       )}
 
       <Dialog open={createOpen} onOpenChange={(o) => setCreateOpen(o)}>
-        <DialogContent className="max-w-md w-full right-0 left-auto top-0 translate-x-0 translate-y-0 rounded-l-none">
+        <DialogContent className="max-w-md w-full">
           <DialogHeader>
             <DialogTitle>Create Assignment</DialogTitle>
             <CardDescription>Set details and save as Draft or Publish.</CardDescription>
@@ -463,12 +474,15 @@ export default function FacultyAssignmentsPage() {
 
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2">Topic (optional)</p>
-              <Select value={topicId} onValueChange={setTopicId}>
+              <Select
+                value={topicId}
+                onValueChange={(value) => setTopicId(value === CLEAR_TOPIC_VALUE ? "" : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select topic (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={CLEAR_TOPIC_VALUE}>None</SelectItem>
                   {topics.map((t: { id: string; name: string }) => (
                     <SelectItem key={t.id} value={t.id}>
                       {t.name}
@@ -499,8 +513,30 @@ export default function FacultyAssignmentsPage() {
                 <Input type="number" value={maxMarks} onChange={(e) => setMaxMarks(e.target.value)} min={0} placeholder="e.g. 50" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment URL (optional)</p>
-                <Input value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} placeholder="https://..." />
+                <p className="text-xs font-medium text-muted-foreground mb-2">Attachment (optional)</p>
+                <Input
+                  type="file"
+                  accept="*/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    uploadCreateAttachmentMutation.mutate(file);
+                    e.currentTarget.value = "";
+                  }}
+                  disabled={uploadCreateAttachmentMutation.isPending || createMutation.isPending}
+                />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {uploadCreateAttachmentMutation.isPending
+                    ? "Uploading..."
+                    : "Upload a file or paste a direct link below."}
+                </p>
+                <Input
+                  className="mt-2"
+                  value={attachmentUrl}
+                  onChange={(e) => setAttachmentUrl(e.target.value)}
+                  placeholder="https://..."
+                  disabled={createMutation.isPending}
+                />
               </div>
             </div>
           </div>
@@ -512,13 +548,14 @@ export default function FacultyAssignmentsPage() {
                 setPublishNow(false);
                 createMutation.mutate();
               }}
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || uploadCreateAttachmentMutation.isPending}
             >
               Save as Draft
             </Button>
             <LoadingButton
-              loading={createMutation.isPending && publishNow}
+              loading={(createMutation.isPending && publishNow) || uploadCreateAttachmentMutation.isPending}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={uploadCreateAttachmentMutation.isPending}
               onClick={() => {
                 setPublishNow(true);
                 createMutation.mutate();
