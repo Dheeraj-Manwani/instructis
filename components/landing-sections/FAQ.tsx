@@ -28,7 +28,7 @@ function FaqItem({ q, a, isOpen, onClick }: { q: string, a: string, isOpen: bool
     <div
       className={cn(
         "border-b border-border py-5 transition-colors cursor-pointer group",
-        isOpen ? "bg-primary/10 dark:bg-primary/15 rounded-r-lg border-l-4 border-l-primary pl-4 pr-4 -ml-[4px]" : "hover:bg-muted/60 px-2 rounded-lg"
+        isOpen ? "bg-primary/10 dark:bg-primary/15 rounded-r-lg border-l-4 border-l-primary pl-4 pr-4 -ml-[4px]" : "hover:bg-muted/60 hover:text-primary dark:hover:bg-primary/10 px-2 rounded-lg"
       )}
       onClick={onClick}
     >

@@ -4,12 +4,14 @@ import { Sparkles } from "lucide-react";
 
 export function Marquee() {
   const items = [
-    "🏆 AIR 1 JEE Advanced 2025",
-    "⭐ 9689 JEE Qualifiers",
-    "🎯 6/10 NEET Top Rankers",
+    "🎯 4/10 NEET Top Rankers",
+    "🎯 4/10 JEE Top Rankers",
     "📚 35 Years of Excellence",
-    "🏛️ 50+ Centers Across India",
-    "👨‍🎓 5 Lakh+ Alumni",
+    "🏛️ 4 Centers Across India",
+    "🚀 Flexible Learning Paths",
+    "👨‍🎓 Over 24 Million Students Mentored",
+    "🎓 90%+ Success Rate in Top Exams",
+
   ];
 
   return (

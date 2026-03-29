@@ -68,6 +68,7 @@ export async function listFacultyClasses(params: {
 
   return rows.map((row) => ({
     id: row.id,
+    groupId: row.groupId,
     batchId: row.batchId,
     batchName: row.batch.name,
     facultyId: row.facultyId,
@@ -106,6 +107,7 @@ export async function listUpcomingClassesForFaculty(facultyId: string, limit: nu
 
   return rows.map((row) => ({
     id: row.id,
+    groupId: row.groupId,
     batchId: row.batchId,
     batchName: row.batch.name,
     facultyId: row.facultyId,
@@ -171,6 +173,7 @@ export async function createClassSession(data: {
   endTime: Date;
   meetLink?: string;
   notes?: string;
+  groupId?: string;
 }) {
   return prisma.classSession.create({
     data: {
@@ -185,12 +188,38 @@ export async function createClassSession(data: {
       endTime: data.endTime,
       meetLink: data.meetLink,
       notes: data.notes,
+      groupId: data.groupId,
       status: "SCHEDULED",
     },
     include: {
       batch: { select: { id: true, name: true } },
       faculty: { include: { user: { select: { name: true } } } },
     },
+  });
+}
+
+export async function createClassSessionsBulk(
+  sessions: Array<{
+    batchId: string;
+    facultyId: string;
+    subject: SubjectEnum;
+    title: string;
+    topic?: string;
+    description?: string;
+    date: Date;
+    startTime: Date;
+    endTime: Date;
+    meetLink?: string;
+    notes?: string;
+    groupId: string;
+  }>
+) {
+  if (!sessions.length) return { count: 0 };
+  return prisma.classSession.createMany({
+    data: sessions.map((session) => ({
+      ...session,
+      status: "SCHEDULED" as const,
+    })),
   });
 }
 
@@ -238,6 +267,73 @@ export async function deleteClassSession(classId: string) {
   await prisma.classSession.delete({ where: { id: classId } });
 }
 
+export async function listFutureGroupedSessions(params: {
+  groupId: string;
+  facultyId: string;
+  fromDate: Date;
+  now: Date;
+}) {
+  return prisma.classSession.findMany({
+    where: {
+      groupId: params.groupId,
+      facultyId: params.facultyId,
+      date: { gte: params.fromDate },
+      endTime: { gte: params.now },
+    },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
+}
+
+export async function countFutureGroupedDeletableSessions(params: {
+  groupId: string;
+  facultyId: string;
+  fromDate: Date;
+  now: Date;
+}) {
+  return prisma.classSession.count({
+    where: {
+      groupId: params.groupId,
+      facultyId: params.facultyId,
+      date: { gte: params.fromDate },
+      startTime: { gt: params.now },
+      status: "SCHEDULED",
+    },
+  });
+}
+
+export async function deleteFutureGroupedSessions(params: {
+  groupId: string;
+  facultyId: string;
+  fromDate: Date;
+  now: Date;
+}) {
+  const rows = await prisma.classSession.findMany({
+    where: {
+      groupId: params.groupId,
+      facultyId: params.facultyId,
+      date: { gte: params.fromDate },
+      startTime: { gt: params.now },
+      status: "SCHEDULED",
+    },
+    select: { id: true },
+  });
+
+  if (!rows.length) return { count: 0 };
+
+  const ids = rows.map((row) => row.id);
+
+  await prisma.$transaction([
+    prisma.attendance.deleteMany({
+      where: { classSessionId: { in: ids } },
+    }),
+    prisma.classSession.deleteMany({
+      where: { id: { in: ids } },
+    }),
+  ]);
+
+  return { count: ids.length };
+}
+
 export async function findStudentByUserId(userId: string) {
   return prisma.student.findUnique({
     where: { userId },
@@ -262,7 +358,6 @@ export async function listStudentClasses(params: {
       ? {
           batchId: params.batchId,
           date: { gte: todayStart },
-          status: "SCHEDULED" as const,
         }
       : params.tab === "today"
         ? {
@@ -291,6 +386,7 @@ export async function listStudentClasses(params: {
 
   return rows.map((row) => ({
     id: row.id,
+    groupId: row.groupId,
     batchId: row.batchId,
     batchName: row.batch.name,
     facultyId: row.facultyId,

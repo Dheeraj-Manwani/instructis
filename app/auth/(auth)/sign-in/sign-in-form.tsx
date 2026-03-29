@@ -26,7 +26,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
 
 const inputClass =
-  "h-10 rounded-lg border border-border/60 bg-muted/50 text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/20";
+  "h-10 rounded-lg border border-border/60 bg-muted/50 text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:placeholder:text-zinc-400 dark:focus-visible:bg-zinc-900";
 
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
@@ -97,7 +97,7 @@ export function SignInForm() {
         <Button
           type="button"
           variant="outline"
-          className="mt-6 h-10 w-full gap-2 rounded-lg border-border bg-background font-medium text-foreground hover:bg-muted/50"
+          className="mt-6 h-10 w-full gap-2 rounded-lg border-border bg-background font-medium text-foreground hover:bg-muted/50 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-100 dark:hover:bg-zinc-800"
           disabled={loading}
           onClick={() => handleSocialSignIn("google")}
         >
@@ -106,10 +106,10 @@ export function SignInForm() {
         </Button>
 
         <div className="relative my-6">
-          <span className="bg-card text-muted-foreground absolute inset-0 flex items-center justify-center text-xs">
-            <span className="bg-card px-2">OR</span>
+          <span className="bg-card text-muted-foreground absolute inset-0 flex items-center justify-center text-xs dark:bg-zinc-900 dark:text-zinc-400">
+            <span className="bg-card px-2 dark:bg-zinc-900">OR</span>
           </span>
-          <div className="h-px bg-border" />
+          <div className="h-px bg-border dark:bg-zinc-700" />
         </div>
 
         <Form {...form}>
@@ -149,7 +149,7 @@ export function SignInForm() {
                     </FormLabel>
                     <Link
                       href="/forgot-password"
-                      className="text-muted-foreground hover:text-primary text-xs underline-offset-4 hover:underline"
+                      className="text-muted-foreground hover:text-primary text-xs underline-offset-4 hover:underline dark:text-zinc-400"
                     >
                       Forgot password?
                     </Link>
@@ -176,10 +176,10 @@ export function SignInForm() {
                     <Checkbox
                       checked={field.value}
                       onCheckedChange={field.onChange}
-                      className="rounded border-border"
+                      className="rounded border-border dark:border-zinc-600 data-[state=checked]:dark:border-primary"
                     />
                   </FormControl>
-                  <FormLabel className="mt-0! cursor-pointer text-muted-foreground text-sm font-normal">
+                  <FormLabel className="mt-0! cursor-pointer text-muted-foreground text-sm font-normal dark:text-zinc-300">
                     Remember me
                   </FormLabel>
                 </FormItem>
@@ -205,7 +205,7 @@ export function SignInForm() {
           </form>
         </Form>
 
-        <p className="text-muted-foreground mt-6 text-center text-sm">
+        <p className="text-muted-foreground mt-6 text-center text-sm dark:text-zinc-400">
           Don&apos;t have an account?{" "}
           <Link
             href="/auth/sign-up"

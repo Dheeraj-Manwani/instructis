@@ -33,11 +33,8 @@ export function Footer() {
               Where Toppers Are Made. India's premier coaching institute for JEE & NEET preparation with a legacy of 35+ years of excellence.
             </p>
             <div className="flex items-center gap-4">
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-primary hover:text-white transition-all"><Instagram className="w-5 h-5" /></a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all"><Youtube className="w-5 h-5" /></a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"><Facebook className="w-5 h-5" /></a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-sky-500 hover:text-white transition-all"><Twitter className="w-5 h-5" /></a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-blue-800 hover:text-white transition-all"><Linkedin className="w-5 h-5" /></a>
+              <a href="https://www.instagram.com/instructis.in?igsh=Zjdzbm44bTM3d2d5" target="_blank" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-primary hover:text-white transition-all"><Instagram className="w-5 h-5" /></a>
+              <a href="https://www.linkedin.com/company/instructiss/" target="_blank" className="w-10 h-10 rounded-full bg-gray-800 dark:bg-zinc-800 flex items-center justify-center hover:bg-blue-800 hover:text-white transition-all"><Linkedin className="w-5 h-5" /></a>
             </div>
           </div>
 
@@ -86,16 +83,16 @@ export function Footer() {
             <ul className="space-y-6">
               <li className="flex items-start gap-4">
                 <MapPin className="w-6 h-6 text-primary shrink-0" />
-                <span className="text-gray-400">Instructis Corporate Office, 45 Knowledge Park, Kota, Rajasthan 324005</span>
+                <span className="text-gray-400">Plot no 13/4 software unit layout madhapur, hydrabad - 5000081</span>
               </li>
               <li className="flex items-center gap-4">
                 <Phone className="w-6 h-6 text-primary shrink-0" />
-                <span className="text-white font-bold text-lg">1800-123-4567</span>
+                <span className="text-white font-bold text-lg">+91 70938 58372</span>
               </li>
-              <li className="flex items-center gap-4">
+              {/* <li className="flex items-center gap-4">
                 <Mail className="w-6 h-6 text-primary shrink-0" />
                 <a href="mailto:info@instructis.com" className="hover:text-white transition-colors">info@instructis.com</a>
-              </li>
+              </li> */}
             </ul>
           </div>
 

@@ -100,12 +100,12 @@ model Student {
 }
 
 model Faculty {
-  id         String  @id @default(cuid())
+  id          String  @id @default(cuid())
   facultyCode String? @unique
-  userId     String  @unique
-  user       User    @relation(fields: [userId], references: [id])
-  title      String?
-  department String?
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id])
+  title       String?
+  department  String?
 
   classSessions ClassSession[]
   assignments   Assignment[]
@@ -384,8 +384,11 @@ model ClassSession {
   status      ClassStatus @default(SCHEDULED)
   cancelNote  String?
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+
+  groupId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   attendances Attendance[]
 }

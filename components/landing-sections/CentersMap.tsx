@@ -63,6 +63,7 @@ function IndiaMapSvg({
   landStroke: string;
 }) {
   const scale = Math.max(520, Math.min(2200, width * 1.72));
+  const { theme } = useTheme();
 
   return (
     <ComposableMap
@@ -107,20 +108,20 @@ function IndiaMapSvg({
               fill="transparent"
               className="pointer-events-auto"
             />
-            <circle
+            {/* <circle
               cx={0}
               cy={0}
               r={8}
               fill={BRAND_GREEN}
               className="animate-pulse opacity-75 pointer-events-none"
-            />
+            /> */}
             <circle
               cx={0}
               cy={0}
-              r={4}
-              fill={BRAND_GREEN}
+              r={5}
+              fill={theme === "dark" ? "white" : BRAND_GREEN}
               strokeWidth={1.5}
-              className="pointer-events-none stroke-background"
+              className="pointer-events-none stroke-background animate-pulse"
             />
             {hoveredCity === city.name && (
               <g transform="translate(0,-20)" className="pointer-events-none">

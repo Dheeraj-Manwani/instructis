@@ -27,7 +27,6 @@ export const updateFacultyBodySchema = z
     facultyCode: z
       .string()
       .trim()
-      .regex(/^[A-Za-z]{2}\d{3}$/, "Faculty ID must be in format AB203")
       .optional(),
     title: z.string().trim().max(120).optional().nullable(),
     department: z.string().trim().max(120).optional().nullable(),

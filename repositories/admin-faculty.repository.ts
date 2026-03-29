@@ -26,17 +26,20 @@ export async function findManyFaculties(params: {
   const skip = (page - 1) * limit;
 
   const where = {
-    ...(department ? { department: { equals: department, mode: "insensitive" as const } } : {}),
-    ...(search
-      ? {
-          user: {
+    ...(department
+      ? { department: { equals: department, mode: "insensitive" as const } }
+      : {}),
+    user: {
+      role: RoleEnum.FACULTY,
+      ...(search
+        ? {
             OR: [
               { name: { contains: search, mode: "insensitive" as const } },
               { email: { contains: search, mode: "insensitive" as const } },
             ],
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
   };
 
   const [records, total] = await Promise.all([

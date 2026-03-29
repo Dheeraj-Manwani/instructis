@@ -16,38 +16,31 @@ import "swiper/css/navigation";
 const slides = [
   {
     id: 1,
-    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1920&h=1080&fit=crop",
-    badge: "🏆 AIR 1 in JEE 2024",
-    title: "India's #1 Coaching for IIT-JEE & NEET",
+    image: process.env.CLOUDFRONT_URL + '/instructis/ins_hero1.png',
+    badge: "🎓 The Next Generation of Education",
+    title: "India's Smartest Coaching for IIT-JEE & NEET",
     subtitle: "Join the legacy of champions. Expert faculty, proven methodology, and unmatched results."
   },
   {
     id: 2,
-    image: "https://images.unsplash.com/photo-1577896851231-70ef18881754?w=1920&h=1080&fit=crop",
-    badge: "⭐ Unmatched Success",
-    title: "9,689 Students Qualified JEE Advanced 2025",
-    subtitle: "Our rigorous curriculum ensures you are always ahead of the competition."
-  },
-  {
-    id: 3,
     image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&h=1080&fit=crop",
     badge: "🩺 Medical Marvels",
-    title: "AIR 1 in NEET — 6 Out of Top 10 From Us",
+    title: "4 Out of Top 10 NEET Rankers From Us",
     subtitle: "Precision focus on NCERT and beyond to secure your seat in top medical colleges."
   },
   {
-    id: 4,
+    id: 3,
     image: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1920&h=1080&fit=crop",
     badge: "👨‍🏫 Master Mentors",
     title: "Learn From IIT & AIIMS Alumni Faculty",
     subtitle: "Get guided by those who have walked the path and conquered it."
   },
   {
-    id: 5,
+    id: 4,
     image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1920&h=1080&fit=crop",
     badge: "🚀 Future Ready",
     title: "Your Dream. Our Mission. Let's Begin.",
-    subtitle: "Admissions open for 2025-26 batches. Limited seats available."
+    subtitle: "Admissions open for 2026-27 batches. Limited seats available."
   }
 ];
 
@@ -186,7 +179,7 @@ export function Hero() {
             <div className="flex items-center gap-4">
               <div className="bg-jee/20 p-3 rounded-xl"><Users className="w-6 h-6 text-jee" /></div>
               <div>
-                <p className="text-white font-bold font-mono text-xl">500K+ Students</p>
+                <p className="text-white font-bold font-mono text-xl">Over 24 Million Students</p>
                 <p className="text-gray-400 text-sm font-medium">Successfully Mentored</p>
               </div>
             </div>
@@ -194,7 +187,7 @@ export function Hero() {
             <div className="flex items-center gap-4">
               <div className="bg-neet/20 p-3 rounded-xl"><Star className="w-6 h-6 text-neet fill-neet" /></div>
               <div>
-                <p className="text-white font-bold font-mono text-xl">95% Success</p>
+                <p className="text-white font-bold font-mono text-xl">Over 90% Success</p>
                 <p className="text-gray-400 text-sm font-medium">Selection Rate in Top Exams</p>
               </div>
             </div>

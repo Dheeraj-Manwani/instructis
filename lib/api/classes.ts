@@ -1,5 +1,10 @@
 import type { ClassStatus, SubjectEnum } from "@prisma/client";
-import type { CreateClassBody, UpdateClassBody } from "@/lib/schemas/class.schema";
+import type {
+  ClassEditDeleteScope,
+  CreateClassBody,
+  CreateRecurringClassBody,
+  UpdateClassBody,
+} from "@/lib/schemas/class.schema";
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -10,6 +15,7 @@ type ApiEnvelope<T> = {
 
 export type ClassSessionItem = {
   id: string;
+  groupId: string | null;
   batchId: string;
   batchName: string;
   facultyId: string;
@@ -79,8 +85,20 @@ export async function createFacultyClass(payload: CreateClassBody) {
   });
 }
 
+export async function createFacultyRecurringClasses(payload: CreateRecurringClassBody) {
+  return request<{ count: number; groupId: string | null; warnings: string[] }>("/api/faculty/classes/bulk", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function updateFacultyClass(classId: string, payload: UpdateClassBody) {
-  return request<{ classSession: ClassSessionItem; warnings: string[] }>(
+  return request<{
+    classSession: ClassSessionItem | null;
+    warnings: string[];
+    updatedCount: number;
+    scopeApplied: ClassEditDeleteScope;
+  }>(
     `/api/faculty/classes/${classId}`,
     {
       method: "PATCH",
@@ -89,10 +107,21 @@ export async function updateFacultyClass(classId: string, payload: UpdateClassBo
   );
 }
 
-export async function deleteFacultyClass(classId: string) {
-  return request<{ id: string }>(`/api/faculty/classes/${classId}`, {
+export async function fetchFacultyDeleteImpact(classId: string, scope: ClassEditDeleteScope) {
+  const query = new URLSearchParams({ scope });
+  return request<{ affectedCount: number; scopeApplied: ClassEditDeleteScope }>(
+    `/api/faculty/classes/${classId}?${query.toString()}`
+  );
+}
+
+export async function deleteFacultyClass(classId: string, scope: ClassEditDeleteScope = "THIS_SESSION") {
+  const query = new URLSearchParams({ scope });
+  return request<{ id: string; deletedCount: number; scopeApplied: ClassEditDeleteScope }>(
+    `/api/faculty/classes/${classId}?${query.toString()}`,
+    {
     method: "DELETE",
-  });
+    }
+  );
 }
 
 export async function fetchStudentClasses(tab: "upcoming" | "today" | "past") {

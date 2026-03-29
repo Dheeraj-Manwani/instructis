@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Copy,
   Leaf,
+  Repeat2,
   Sigma,
   Sprout,
   Trash2,
@@ -36,19 +37,37 @@ import { ClassStatusBadge } from "@/components/class-status-badge";
 import { SUBJECTS, SUBJECT_THEME } from "@/lib/constants/class-schedule";
 import { cn } from "@/lib/utils";
 import {
+  createFacultyRecurringClasses,
   createFacultyClass,
+  fetchFacultyDeleteImpact,
   deleteFacultyClass,
   fetchFacultyClasses,
   type ClassSessionItem,
   updateFacultyClass,
 } from "@/lib/api/classes";
-import type { CreateClassBody, UpdateClassBody } from "@/lib/schemas/class.schema";
+import type {
+  ClassEditDeleteScope,
+  CreateClassBody,
+  CreateRecurringClassBody,
+  UpdateClassBody,
+} from "@/lib/schemas/class.schema";
 import type { SubjectEnum } from "@prisma/client";
 
 const HOUR_START = 9;
 const HOUR_END = 20;
 const SLOT_MINUTES = 30;
 const TOTAL_SLOTS = ((HOUR_END - HOUR_START) * 60) / SLOT_MINUTES;
+const MAX_RECURRING_DAYS = 31;
+
+const RECURRING_WEEKDAY_OPTIONS = [
+  { key: "SUNDAY", label: "Sun", index: 0 },
+  { key: "MONDAY", label: "Mon", index: 1 },
+  { key: "TUESDAY", label: "Tue", index: 2 },
+  { key: "WEDNESDAY", label: "Wed", index: 3 },
+  { key: "THURSDAY", label: "Thu", index: 4 },
+  { key: "FRIDAY", label: "Fri", index: 5 },
+  { key: "SATURDAY", label: "Sat", index: 6 },
+] as const;
 
 function subjectIcon(subject: SubjectEnum) {
   switch (subject) {
@@ -90,6 +109,22 @@ function formatTimeRange(start: string, end: string) {
   return `${format(parseISO(start), "hh:mm a")} - ${format(parseISO(end), "hh:mm a")}`;
 }
 
+function countRecurringMatches(startDate: string, endDate: string, selectedDays: number[]) {
+  if (!startDate || !endDate || selectedDays.length === 0) return 0;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+
+  const selectedDaySet = new Set(selectedDays);
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (selectedDaySet.has(cursor.getDay())) count += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
 type ClassFormState = {
   batchId: string;
   subject: SubjectEnum;
@@ -128,9 +163,17 @@ export function FacultyClassesPageClient() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [editScope, setEditScope] = useState<ClassEditDeleteScope>("THIS_SESSION");
   const [form, setForm] = useState<ClassFormState>(INITIAL_FORM);
+  const [createMode, setCreateMode] = useState<"ONE_TIME" | "REPEATING">("ONE_TIME");
+  const [repeatDaysOfWeek, setRepeatDaysOfWeek] = useState<CreateRecurringClassBody["daysOfWeek"]>([]);
+  const [repeatStartDate, setRepeatStartDate] = useState(toLocalDateInputValue(new Date()));
+  const [repeatEndDate, setRepeatEndDate] = useState(toLocalDateInputValue(new Date()));
 
   const [selectedClass, setSelectedClass] = useState<ClassSessionItem | null>(null);
+  const [scopePromptClass, setScopePromptClass] = useState<ClassSessionItem | null>(null);
+  const [scopePromptMode, setScopePromptMode] = useState<"EDIT" | "DELETE" | null>(null);
+  const [deleteScope, setDeleteScope] = useState<ClassEditDeleteScope>("THIS_SESSION");
 
   useEffect(() => {
     setBreadcrumb([{ label: "Classes", href: "/faculty/classes" }]);
@@ -186,6 +229,45 @@ export function FacultyClassesPageClient() {
     onError: (err: Error) => toast.error(err.message || "Failed to schedule class"),
   });
 
+  const bulkScheduleMutation = useMutation({
+    mutationFn: async () => {
+      const startIso = toDateTimeIsoFromLocal(repeatStartDate, form.startTime);
+      const endIso = toDateTimeIsoFromLocal(repeatStartDate, form.endTime);
+      if (new Date(endIso) <= new Date(startIso)) {
+        throw new Error("End time must be after start time");
+      }
+      if (!repeatDaysOfWeek.length) {
+        throw new Error("Pick at least one day of the week");
+      }
+
+      const payload: CreateRecurringClassBody = {
+        batchId: form.batchId,
+        subject: form.subject,
+        title: form.title.trim(),
+        topic: form.topic.trim() || undefined,
+        description: form.description.trim() || undefined,
+        startDate: new Date(`${repeatStartDate}T00:00:00`).toISOString(),
+        endDate: new Date(`${repeatEndDate}T00:00:00`).toISOString(),
+        daysOfWeek: repeatDaysOfWeek,
+        startTime: startIso,
+        endTime: endIso,
+        meetLink: form.meetLink.trim() || undefined,
+        notes: form.notes.trim() || undefined,
+      };
+      return createFacultyRecurringClasses(payload);
+    },
+    onSuccess: async (res) => {
+      toast.success(`Scheduled ${res.count} recurring sessions`);
+      res.warnings.forEach((warning) => toast(warning));
+      setIsFormOpen(false);
+      setForm(INITIAL_FORM);
+      setCreateMode("ONE_TIME");
+      setRepeatDaysOfWeek([]);
+      await queryClient.invalidateQueries({ queryKey: ["classes", "faculty"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to schedule recurring classes"),
+  });
+
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!editingClassId) throw new Error("No class selected");
@@ -201,19 +283,27 @@ export function FacultyClassesPageClient() {
         title: form.title.trim(),
         topic: form.topic.trim() || null,
         description: form.description.trim() || null,
-        date: new Date(`${form.date}T00:00:00`).toISOString(),
         startTime: startIso,
         endTime: endIso,
         meetLink: form.meetLink.trim() || null,
         notes: form.notes.trim() || null,
+        scope: editScope,
       };
+      if (editScope === "THIS_SESSION") {
+        payload.date = new Date(`${form.date}T00:00:00`).toISOString();
+      }
       return updateFacultyClass(editingClassId, payload);
     },
     onSuccess: async (res) => {
-      toast.success("Class updated successfully");
+      toast.success(
+        res.updatedCount > 1
+          ? `Updated ${res.updatedCount} upcoming classes`
+          : "Class updated successfully"
+      );
       res.warnings.forEach((warning) => toast(warning));
       setIsFormOpen(false);
       setEditingClassId(null);
+      setEditScope("THIS_SESSION");
       setForm(INITIAL_FORM);
       await queryClient.invalidateQueries({ queryKey: ["classes", "faculty"] });
     },
@@ -236,13 +326,29 @@ export function FacultyClassesPageClient() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteFacultyClass,
+    mutationFn: ({ classId, scope }: { classId: string; scope: ClassEditDeleteScope }) =>
+      deleteFacultyClass(classId, scope),
     onSuccess: async () => {
       toast.success("Class deleted");
       setSelectedClass(null);
+      setScopePromptClass(null);
+      setScopePromptMode(null);
       await queryClient.invalidateQueries({ queryKey: ["classes", "faculty"] });
     },
     onError: (err: Error) => toast.error(err.message || "Failed to delete class"),
+  });
+
+  const deleteImpactQuery = useQuery({
+    queryKey: ["classes", "faculty", "delete-impact", scopePromptClass?.id, deleteScope],
+    queryFn: () => {
+      if (!scopePromptClass) throw new Error("No class selected");
+      return fetchFacultyDeleteImpact(scopePromptClass.id, deleteScope);
+    },
+    enabled:
+      !!scopePromptClass &&
+      scopePromptMode === "DELETE" &&
+      deleteScope === "FUTURE_IN_GROUP" &&
+      !!scopePromptClass.groupId,
   });
 
   const data = classesQuery.data;
@@ -267,16 +373,24 @@ export function FacultyClassesPageClient() {
 
   const openCreate = () => {
     setEditingClassId(null);
+    setEditScope("THIS_SESSION");
+    setCreateMode("ONE_TIME");
     setForm((prev) => ({
       ...INITIAL_FORM,
       batchId: prev.batchId || data?.batches?.[0]?.id || "",
       date: toLocalDateInputValue(weekStart),
     }));
+    const defaultStart = toLocalDateInputValue(weekStart);
+    setRepeatStartDate(defaultStart);
+    setRepeatEndDate(defaultStart);
+    setRepeatDaysOfWeek([]);
     setIsFormOpen(true);
   };
 
-  const openEdit = (item: ClassSessionItem) => {
+  const openEdit = (item: ClassSessionItem, scope: ClassEditDeleteScope = "THIS_SESSION") => {
     setEditingClassId(item.id);
+    setEditScope(scope);
+    setCreateMode("ONE_TIME");
     setForm({
       batchId: item.batchId,
       subject: item.subject,
@@ -289,7 +403,58 @@ export function FacultyClassesPageClient() {
       meetLink: item.meetLink ?? "",
       notes: item.notes ?? "",
     });
+    setScopePromptClass(null);
+    setScopePromptMode(null);
     setIsFormOpen(true);
+  };
+
+  const recurringMaxEndDate = useMemo(() => {
+    const start = new Date(`${repeatStartDate}T00:00:00`);
+    if (Number.isNaN(start.getTime())) return repeatStartDate;
+    return toLocalDateInputValue(addDays(start, MAX_RECURRING_DAYS - 1));
+  }, [repeatStartDate]);
+
+  const recurringPreviewCount = useMemo(() => {
+    const selectedIndexes = RECURRING_WEEKDAY_OPTIONS
+      .filter((option) => repeatDaysOfWeek.includes(option.key))
+      .map((option) => option.index);
+    return countRecurringMatches(repeatStartDate, repeatEndDate, selectedIndexes);
+  }, [repeatStartDate, repeatEndDate, repeatDaysOfWeek]);
+
+  const handleRepeatStartDateChange = (nextStartDate: string) => {
+    setRepeatStartDate(nextStartDate);
+    const start = new Date(`${nextStartDate}T00:00:00`);
+    const currentEnd = new Date(`${repeatEndDate}T00:00:00`);
+    if (Number.isNaN(start.getTime())) return;
+
+    const maxEnd = addDays(start, MAX_RECURRING_DAYS - 1);
+    if (Number.isNaN(currentEnd.getTime()) || currentEnd < start) {
+      setRepeatEndDate(nextStartDate);
+      return;
+    }
+    if (currentEnd > maxEnd) {
+      setRepeatEndDate(toLocalDateInputValue(maxEnd));
+    }
+  };
+
+  const handleRepeatEndDateChange = (nextEndDate: string) => {
+    const start = new Date(`${repeatStartDate}T00:00:00`);
+    const end = new Date(`${nextEndDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setRepeatEndDate(nextEndDate);
+      return;
+    }
+
+    const maxEnd = addDays(start, MAX_RECURRING_DAYS - 1);
+    if (end < start) {
+      setRepeatEndDate(repeatStartDate);
+      return;
+    }
+    if (end > maxEnd) {
+      setRepeatEndDate(toLocalDateInputValue(maxEnd));
+      return;
+    }
+    setRepeatEndDate(nextEndDate);
   };
 
   return (
@@ -434,7 +599,14 @@ export function FacultyClassesPageClient() {
                                 <td className="p-2">{format(parseISO(item.date), "EEE, MMM d")}</td>
                                 <td className="p-2">{formatTimeRange(item.startTime, item.endTime)}</td>
                                 <td className="p-2">{item.subject}</td>
-                                <td className="p-2">{item.title}</td>
+                                <td className="p-2">
+                                  <div className="flex items-center gap-1">
+                                    {item.groupId && (
+                                      <Repeat2 className="h-3.5 w-3.5 text-muted-foreground" aria-label="Recurring class" />
+                                    )}
+                                    <span>{item.title}</span>
+                                  </div>
+                                </td>
                                 <td className="p-2">{item.batchName}</td>
                                 <td className="p-2">
                                   {item.meetLink ? (
@@ -532,6 +704,7 @@ export function FacultyClassesPageClient() {
                                     <div className={cn("mb-1 flex items-center gap-1 font-medium", theme.text)}>
                                       {item.status === "LIVE" && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
                                       <Icon className="h-3 w-3" />
+                                      {item.groupId && <Repeat2 className="h-3 w-3" />}
                                       <span className="truncate">{item.title}</span>
                                     </div>
                                     <p className="truncate">{item.topic || "No topic"}</p>
@@ -570,6 +743,7 @@ export function FacultyClassesPageClient() {
                     <div key={item.id} className="rounded-lg border p-3">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <Icon className="h-4 w-4" />
+                        {item.groupId && <Repeat2 className="h-3.5 w-3.5 text-muted-foreground" />}
                         <span className="truncate">{item.title}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -620,6 +794,29 @@ export function FacultyClassesPageClient() {
             <DialogHeader>
               <DialogTitle>{editingClassId ? "Edit Class" : "Schedule Class"}</DialogTitle>
             </DialogHeader>
+            {!editingClassId && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={createMode === "ONE_TIME" ? "default" : "outline"}
+                  onClick={() => setCreateMode("ONE_TIME")}
+                >
+                  One-time class
+                </Button>
+                <Button
+                  type="button"
+                  variant={createMode === "REPEATING" ? "default" : "outline"}
+                  onClick={() => setCreateMode("REPEATING")}
+                >
+                  Repeating classes
+                </Button>
+              </div>
+            )}
+            {editingClassId && editScope === "FUTURE_IN_GROUP" && (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+                You are editing all upcoming sessions in this repeating group. Date is locked to protect the series pattern.
+              </p>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <p className="mb-1 text-xs text-muted-foreground">Batch</p>
@@ -674,15 +871,73 @@ export function FacultyClassesPageClient() {
                   className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 />
               </div>
-              <div>
-                <p className="mb-1 text-xs text-muted-foreground">Date</p>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                />
-              </div>
+              {editingClassId || createMode === "ONE_TIME" ? (
+                <div>
+                  <p className="mb-1 text-xs text-muted-foreground">Date</p>
+                  <input
+                    type="date"
+                    value={form.date}
+                    disabled={editingClassId !== null && editScope === "FUTURE_IN_GROUP"}
+                    onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+              ) : (
+                <div className="md:col-span-2">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-xs text-muted-foreground">Start Date</p>
+                      <input
+                        type="date"
+                        value={repeatStartDate}
+                        onChange={(e) => handleRepeatStartDateChange(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs text-muted-foreground">End Date</p>
+                      <input
+                        type="date"
+                        value={repeatEndDate}
+                        min={repeatStartDate}
+                        max={recurringMaxEndDate}
+                        onChange={(e) => handleRepeatEndDateChange(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Maximum range is {MAX_RECURRING_DAYS} days from the start date.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs text-muted-foreground">Repeat On</p>
+                    <div className="flex flex-wrap gap-2">
+                      {RECURRING_WEEKDAY_OPTIONS.map((day) => {
+                        const checked = repeatDaysOfWeek.includes(day.key);
+                        return (
+                          <Button
+                            key={day.key}
+                            type="button"
+                            variant={checked ? "default" : "outline"}
+                            size="sm"
+                            onClick={() =>
+                              setRepeatDaysOfWeek((prev) =>
+                                checked ? prev.filter((item) => item !== day.key) : [...prev, day.key]
+                              )
+                            }
+                          >
+                            {day.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Preview: this setup will create <span className="font-semibold text-foreground">{recurringPreviewCount}</span>{" "}
+                      sessions.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div>
                 <p className="mb-1 text-xs text-muted-foreground">Start Time</p>
                 <input
@@ -736,10 +991,30 @@ export function FacultyClassesPageClient() {
               </Button>
               <Button
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={scheduleMutation.isPending || updateMutation.isPending || !form.title.trim()}
-                onClick={() => (editingClassId ? updateMutation.mutate() : scheduleMutation.mutate())}
+                disabled={
+                  scheduleMutation.isPending ||
+                  bulkScheduleMutation.isPending ||
+                  updateMutation.isPending ||
+                  !form.title.trim() ||
+                  (!editingClassId && createMode === "REPEATING" && recurringPreviewCount === 0)
+                }
+                onClick={() => {
+                  if (editingClassId) {
+                    updateMutation.mutate();
+                    return;
+                  }
+                  if (createMode === "REPEATING") {
+                    bulkScheduleMutation.mutate();
+                    return;
+                  }
+                  scheduleMutation.mutate();
+                }}
               >
-                {editingClassId ? "Save Changes" : "Schedule Class"}
+                {editingClassId
+                  ? "Save Changes"
+                  : createMode === "REPEATING"
+                    ? "Schedule Recurring Classes"
+                    : "Schedule Class"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -755,6 +1030,12 @@ export function FacultyClassesPageClient() {
                     <span className={cn("rounded-md px-2 py-1 text-xs font-medium", SUBJECT_THEME[selectedClass.subject].card)}>
                       {selectedClass.subject}
                     </span>
+                    {selectedClass.groupId && (
+                      <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground">
+                        <Repeat2 className="h-3 w-3" />
+                        Repeating
+                      </span>
+                    )}
                   </div>
                   <SheetTitle className="text-xl">{selectedClass.title}</SheetTitle>
                   <SheetDescription>{selectedClass.batchName}</SheetDescription>
@@ -793,7 +1074,17 @@ export function FacultyClassesPageClient() {
                 )}
 
                 <SheetFooter className="mt-6 border-t pt-4">
-                  <Button variant="outline" onClick={() => openEdit(selectedClass)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedClass.groupId) {
+                        setScopePromptClass(selectedClass);
+                        setScopePromptMode("EDIT");
+                        return;
+                      }
+                      openEdit(selectedClass, "THIS_SESSION");
+                    }}
+                  >
                     Edit Class
                   </Button>
                   <Button
@@ -839,8 +1130,14 @@ export function FacultyClassesPageClient() {
                       <Button
                         variant="destructive"
                         onClick={() => {
-                          if (!window.confirm("Delete this class?")) return;
-                          deleteMutation.mutate(selectedClass.id);
+                          if (selectedClass.groupId) {
+                            setScopePromptClass(selectedClass);
+                            setScopePromptMode("DELETE");
+                            setDeleteScope("THIS_SESSION");
+                            return;
+                          }
+                          if (!window.confirm("Delete this class session?")) return;
+                          deleteMutation.mutate({ classId: selectedClass.id, scope: "THIS_SESSION" });
                         }}
                       >
                         <Trash2 className="mr-1 h-4 w-4" />
@@ -852,6 +1149,114 @@ export function FacultyClassesPageClient() {
             )}
           </SheetContent>
         </Sheet>
+
+        <Dialog
+          open={scopePromptMode === "EDIT" && !!scopePromptClass}
+          onOpenChange={(open) => {
+            if (!open) {
+              setScopePromptClass(null);
+              setScopePromptMode(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit repeating class</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This class belongs to a repeating group. Choose what you want to edit.
+            </p>
+            <div className="grid gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!scopePromptClass) return;
+                  openEdit(scopePromptClass, "THIS_SESSION");
+                }}
+              >
+                Edit this session only
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!scopePromptClass) return;
+                  openEdit(scopePromptClass, "FUTURE_IN_GROUP");
+                }}
+              >
+                Edit all upcoming sessions in this group
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={scopePromptMode === "DELETE" && !!scopePromptClass}
+          onOpenChange={(open) => {
+            if (!open) {
+              setScopePromptClass(null);
+              setScopePromptMode(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Delete repeating class</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This class is part of a repeating group. Deleting cannot be undone.
+            </p>
+            <div className="grid gap-2">
+              <Button
+                type="button"
+                variant={deleteScope === "THIS_SESSION" ? "default" : "outline"}
+                onClick={() => setDeleteScope("THIS_SESSION")}
+              >
+                Delete this class session only
+              </Button>
+              <Button
+                type="button"
+                variant={deleteScope === "FUTURE_IN_GROUP" ? "default" : "outline"}
+                onClick={() => setDeleteScope("FUTURE_IN_GROUP")}
+              >
+                Delete all upcoming classes in this repeating group
+              </Button>
+            </div>
+            <p className="rounded-md border border-red-600/30 bg-red-600/10 px-3 py-2 text-sm text-red-700">
+              {deleteScope === "FUTURE_IN_GROUP"
+                ? deleteImpactQuery.isLoading
+                  ? "Calculating how many upcoming class sessions will be deleted..."
+                  : `This will delete ${deleteImpactQuery.data?.affectedCount ?? 0} upcoming class sessions in this group.`
+                : "This will delete 1 class session."}
+            </p>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setScopePromptClass(null);
+                  setScopePromptMode(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={
+                  deleteMutation.isPending ||
+                  (deleteScope === "FUTURE_IN_GROUP" && deleteImpactQuery.isLoading) ||
+                  (deleteScope === "FUTURE_IN_GROUP" && (deleteImpactQuery.data?.affectedCount ?? 0) === 0)
+                }
+                onClick={() => {
+                  if (!scopePromptClass) return;
+                  deleteMutation.mutate({
+                    classId: scopePromptClass.id,
+                    scope: deleteScope,
+                  });
+                }}
+              >
+                {deleteScope === "FUTURE_IN_GROUP" ? "Delete upcoming group classes" : "Delete this class"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
