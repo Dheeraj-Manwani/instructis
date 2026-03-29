@@ -809,7 +809,15 @@ export async function getTestAttemptWithStudentAndTestOrThrow(attemptId: string)
                     },
                 },
             },
-            mockTest: true,
+            mockTest: {
+                include: {
+                    batch: {
+                        select: {
+                            examType: true,
+                        },
+                    },
+                },
+            },
         },
     });
 

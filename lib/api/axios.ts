@@ -8,6 +8,10 @@ export const api = axios.create({
 // Request interceptor — attach auth token if needed (for mobile/external clients)
 // For Next.js web app, Better Auth uses cookies automatically — no token needed
 api.interceptors.request.use((config) => {
+    // Allow absolute app routes like /api/admin/* to bypass the /api/v1 baseURL.
+    if (config.url?.startsWith("/api/")) {
+        config.baseURL = "";
+    }
     return config;
 });
 

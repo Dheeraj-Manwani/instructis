@@ -55,12 +55,23 @@ export async function uploadBytesToS3(params: {
   contentType?: string;
   contentDisposition?: string;
 }) {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const region = process.env.AWS_REGION;
   const bucket = process.env.S3_BUCKET_NAME;
-  if (!bucket) {
-    throw new AppError("S3_BUCKET_NAME is not configured", 500);
+
+  if (!accessKeyId || !secretAccessKey || !region || !bucket) {
+    throw new AppError("AWS S3 environment variables are not fully configured", 500);
   }
 
-  const s3 = getS3Client();
+  const s3 = new S3Client({
+    region: 'ap-east-1',
+    followRegionRedirects: true,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,

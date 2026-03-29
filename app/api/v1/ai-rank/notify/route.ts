@@ -5,7 +5,7 @@ import { withAuth } from "@/lib/middlewares/withAuth";
 import { withRole } from "@/lib/middlewares/withRole";
 import { withValidation } from "@/lib/middlewares/withValidation";
 import { ApiResponse } from "@/lib/utils/api-response";
-import { aiRankNotifySchema } from "@/lib/validations/ai-rank.schema";
+import { aiRankNotifySchema } from "@/lib/schemas/ai-rank.schema";
 import * as aiRankService from "@/services/ai-rank.service";
 
 export const POST = catchAsync(async (req: NextRequest) => {

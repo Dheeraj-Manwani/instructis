@@ -2,7 +2,6 @@
 
 import { User } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
-import { RoleEnum } from "@prisma/client";
 import { LogOutIcon, ShieldIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,6 +18,14 @@ import {
 
 interface UserDropdownProps {
   user: User;
+}
+
+function formatRole(role?: string) {
+  if (!role) return "Unknown";
+  return role
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function UserDropdown({ user }: UserDropdownProps) {
@@ -44,11 +51,9 @@ export function UserDropdown({ user }: UserDropdownProps) {
         <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
           <span className="text-sm text-muted-foreground">{user.email}</span>
           {user.role && (
-            <span className="text-xs font-medium text-foreground">
-              {String(user.role)
-                .replace(/_/g, " ")
-                .toLowerCase()
-                .replace(/\b\w/g, (c) => c.toUpperCase())}
+            <span className="mt-1 inline-flex items-center gap-1 text-xs text-foreground/80">
+              <ShieldIcon className="size-3.5 text-primary" />
+              <span className="font-medium">Role: {formatRole(String(user.role))}</span>
             </span>
           )}
         </DropdownMenuLabel>
@@ -58,20 +63,9 @@ export function UserDropdown({ user }: UserDropdownProps) {
             <UserIcon className="size-4" /> <span>Profile</span>
           </Link>
         </DropdownMenuItem>
-        {/* {user.role === RoleEnum.ADMIN && <AdminItem />} */}
         <SignOutItem />
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function AdminItem() {
-  return (
-    <DropdownMenuItem asChild>
-      <Link href="/admin">
-        <ShieldIcon className="size-4" /> <span>Admin</span>
-      </Link>
-    </DropdownMenuItem>
   );
 }
 

@@ -90,23 +90,25 @@ model Student {
   dob         DateTime?
 
   assignmentSubmissions AssignmentSubmission[]
-  marks           Mark[]
-  testAttempts    TestAttempt[]
-  weakAreas       WeakArea[]
-  rankPredictions RankPrediction[]
-  attendances     Attendance[]
-  whatsappLogs    WhatsAppLog[]
+  marks                 Mark[]
+  testAttempts          TestAttempt[]
+  weakAreas             WeakArea[]
+  rankPredictions       RankPrediction[]
+  attendances           Attendance[]
+  whatsappLogs          WhatsAppLog[]
+  studentFees           StudentFee[]
 }
 
 model Faculty {
   id         String  @id @default(cuid())
+  facultyCode String? @unique
   userId     String  @unique
   user       User    @relation(fields: [userId], references: [id])
   title      String?
   department String?
 
   classSessions ClassSession[]
-  assignments Assignment[]
+  assignments   Assignment[]
 
   questions Question[]
   mockTests MockTest[]
@@ -123,11 +125,12 @@ model Batch {
   createdAt DateTime @default(now())
 
   classSessions ClassSession[]
-  assignments Assignment[]
+  assignments   Assignment[]
 
-  students  Student[]
-  faculties BatchFaculty[]
-  mockTests MockTest[]
+  students    Student[]
+  faculties   BatchFaculty[]
+  mockTests   MockTest[]
+  studentFees StudentFee[]
 }
 
 model BatchFaculty {
@@ -145,8 +148,8 @@ model Topic {
   subject SubjectEnum
 
   assignments Assignment[]
-  questions Question[]
-  weakAreas WeakArea[]
+  questions   Question[]
+  weakAreas   WeakArea[]
 }
 
 model Question {
@@ -345,38 +348,48 @@ enum CourseMode {
   HYBRID
 }
 
-
-
 model CallbackRequest {
-  id             String         @id @default(cuid())
-  fullName       String
-  mobileNumber   String
-  courseMode     CourseMode?
-  examType       ExamType?
-  status         CallbackStatus @default(PENDING)
-  adminNote      String?
-  createdAt      DateTime       @default(now())
-  calledAt       DateTime?
+  id           String         @id @default(cuid())
+  fullName     String
+  mobileNumber String
+  courseMode   CourseMode?
+  examType     ExamType?
+  status       CallbackStatus @default(PENDING)
+  adminNote    String?
+  createdAt    DateTime       @default(now())
+  calledAt     DateTime?
+}
+
+enum ClassStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
 }
 
 model ClassSession {
-  id        String      @id @default(cuid())
-  batchId   String
-  batch     Batch       @relation(fields: [batchId], references: [id])
-  facultyId String
-  faculty   Faculty     @relation(fields: [facultyId], references: [id])
-  subject   SubjectEnum
-  topic     String?
-  date      DateTime
-  startTime DateTime?
-  endTime   DateTime?
-  notes     String?
-  createdAt DateTime    @default(now())
+  id          String      @id @default(cuid())
+  batchId     String
+  batch       Batch       @relation(fields: [batchId], references: [id])
+  facultyId   String
+  faculty     Faculty     @relation(fields: [facultyId], references: [id])
+  subject     SubjectEnum
+  title       String
+  topic       String?
+  description String?
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime
+  meetLink    String?
+  status      ClassStatus @default(SCHEDULED)
+  cancelNote  String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   attendances Attendance[]
 }
 
-// Replace your existing Attendance model with this:
 model Attendance {
   id             String       @id @default(cuid())
   studentId      String
@@ -384,10 +397,10 @@ model Attendance {
   classSessionId String
   classSession   ClassSession @relation(fields: [classSessionId], references: [id])
   isPresent      Boolean      @default(true)
-  note           String?      // "Left early", "Medical", etc.
+  note           String? // "Left early", "Medical", etc.
   createdAt      DateTime     @default(now())
 
-  @@unique([studentId, classSessionId])  // one record per student per class
+  @@unique([studentId, classSessionId]) // one record per student per class
   @@index([studentId])
 }
 
@@ -405,44 +418,84 @@ enum SubmissionStatus {
 }
 
 model Assignment {
-  id          String           @id @default(cuid())
-  title       String
-  description String?
-  subject     SubjectEnum
-  topicId     String?
-  topic       Topic?           @relation(fields: [topicId], references: [id])
-  batchId     String
-  batch       Batch            @relation(fields: [batchId], references: [id])
-  facultyId   String
-  faculty     Faculty          @relation(fields: [facultyId], references: [id])
-  status      AssignmentStatus @default(DRAFT)
-  dueDate     DateTime?
-  maxMarks    Float?
-  attachmentUrl String?        // optional PDF/link the faculty shares
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id            String           @id @default(cuid())
+  title         String
+  description   String?
+  subject       SubjectEnum
+  topicId       String?
+  topic         Topic?           @relation(fields: [topicId], references: [id])
+  batchId       String
+  batch         Batch            @relation(fields: [batchId], references: [id])
+  facultyId     String
+  faculty       Faculty          @relation(fields: [facultyId], references: [id])
+  status        AssignmentStatus @default(DRAFT)
+  dueDate       DateTime?
+  maxMarks      Float?
+  attachmentUrl String? // optional PDF/link the faculty shares
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   submissions AssignmentSubmission[]
 }
 
 model AssignmentSubmission {
-  id           String           @id @default(cuid())
-  assignmentId String
-  assignment   Assignment       @relation(fields: [assignmentId], references: [id])
-  studentId    String
-  student      Student          @relation(fields: [studentId], references: [id])
-  status       SubmissionStatus @default(PENDING)
-  note         String?          // student's submission note
-  attachmentUrl String?         // student's submitted file/link
+  id            String           @id @default(cuid())
+  assignmentId  String
+  assignment    Assignment       @relation(fields: [assignmentId], references: [id])
+  studentId     String
+  student       Student          @relation(fields: [studentId], references: [id])
+  status        SubmissionStatus @default(PENDING)
+  note          String? // student's submission note
+  attachmentUrl String? // student's submitted file/link
   marksAwarded  Float?
-  feedback      String?         // faculty feedback after grading
+  feedback      String? // faculty feedback after grading
   submittedAt   DateTime?
   gradedAt      DateTime?
-  createdAt     DateTime        @default(now())
+  createdAt     DateTime         @default(now())
 
-  @@unique([assignmentId, studentId])  // one submission per student per assignment
+  @@unique([assignmentId, studentId]) // one submission per student per assignment
   @@index([studentId])
   @@index([assignmentId])
+}
+
+enum InstallmentStatus {
+  PAID_FULLY
+  PAID_PARTIALLY
+  UNPAID
+  PENDING
+  OVERDUE
+}
+
+model StudentFee {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id])
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  totalAmount Float
+  discount    Float    @default(0)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  installments FeeInstallment[]
+
+  @@unique([studentId, batchId])
+}
+
+model FeeInstallment {
+  id           String            @id @default(cuid())
+  studentFeeId String
+  studentFee   StudentFee        @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  dueDate      DateTime
+  dueAmount    Float
+  paidAmount   Float             @default(0)
+  status       InstallmentStatus @default(UNPAID)
+  paidAt       DateTime?
+  recordedById String?
+  remark       String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 }
 
 // auth specific models

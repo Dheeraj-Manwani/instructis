@@ -360,15 +360,20 @@ export default function StudentAssignmentsPage() {
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {uploadSubmitAttachmentMutation.isPending
                     ? "Uploading..."
-                    : "Upload a file or paste a direct link below."}
+                    : submitAttachmentUrl
+                      ? "Attachment uploaded."
+                      : "Upload a file below."}
                 </p>
-                <Input
-                  className="mt-2"
-                  value={submitAttachmentUrl}
-                  onChange={(e) => setSubmitAttachmentUrl(e.target.value)}
-                  placeholder="https://..."
-                  disabled={submitMutation.isPending}
-                />
+                {submitAttachmentUrl && (
+                  <a
+                    className="mt-2 inline-block text-xs text-primary underline break-all"
+                    href={submitAttachmentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View uploaded attachment
+                  </a>
+                )}
               </div>
 
               <div>

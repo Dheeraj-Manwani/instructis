@@ -21,6 +21,8 @@ import {
   LucideIcon,
   CalendarCheck,
   ClipboardList,
+  GraduationCap,
+  IndianRupee,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -58,6 +60,7 @@ const allNavItems: NavItem[] = [
   { title: "My Batches", path: "/my-batches", icon: Users, roles: [RoleEnum.FACULTY] },
   { title: "Topics", path: "/topics", icon: BookOpen, roles: [RoleEnum.FACULTY] },
   { title: "Questions", path: "/questions", icon: PenTool, roles: [RoleEnum.FACULTY] },
+  { title: "Classes", path: "/faculty/classes", icon: CalendarCheck, roles: [RoleEnum.FACULTY] },
   // { title: "Attendance", path: "/faculty/attendance", icon: CalendarCheck, roles: [RoleEnum.FACULTY] },
   // { title: "Assignments", path: "/faculty/assignments", icon: ClipboardList, roles: [RoleEnum.FACULTY] },
 
@@ -65,11 +68,14 @@ const allNavItems: NavItem[] = [
   { title: "My Tests", path: "/my-tests", icon: FileText, roles: [RoleEnum.STUDENT] },
   { title: "AI Rank Predictor", path: "/ai-rank-predictor", icon: Brain, roles: [RoleEnum.STUDENT] },
   { title: "Practice", path: "/practice", icon: BookOpen, roles: [RoleEnum.STUDENT] },
+  { title: "Classes", path: "/student/classes", icon: CalendarCheck, roles: [RoleEnum.STUDENT] },
   // { title: "Attendance", path: "/student/attendance", icon: CalendarCheck, roles: [RoleEnum.STUDENT] },
   // { title: "Assignments", path: "/student/assignments", icon: ClipboardList, roles: [RoleEnum.STUDENT] },
 
   // existing admin items
   { title: "Batches", path: "/batches", icon: Users, roles: [RoleEnum.ADMIN] },
+  { title: "Faculties", path: "/admin/faculties", icon: GraduationCap, roles: [RoleEnum.ADMIN] },
+  { title: "Payments", path: "/admin/payments", icon: IndianRupee, roles: [RoleEnum.ADMIN] },
   { title: "User Management", path: "/admin/users", icon: ShieldCheck, roles: [RoleEnum.ADMIN] },
   { title: "Callback Requests", path: "/admin/callback-requests", icon: MessageCircle, roles: [RoleEnum.ADMIN] },
 ];
@@ -82,6 +88,7 @@ const pageTitles: Record<string, string> = {
   "/my-batches": "My Batches",
   "/topics": "Topics",
   "/questions": "Questions",
+  "/faculty/classes": "Classes",
   "/analysis": "Student Question Analysis",
   "/results": "Exam Results",
   "/predicter": "AI Rank Predictor",
@@ -91,9 +98,12 @@ const pageTitles: Record<string, string> = {
   "/my-tests": "My Tests",
   "/ai-rank-predictor": "AI Rank Predictor",
   "/practice": "Practice",
+  "/student/classes": "Classes",
 
   // admin pages
   "/batches": "Batches",
+  "/admin/faculties": "Faculties",
+  "/admin/payments": "Payments",
   "/admin/users": "User Management",
   "/admin/callback-requests": "Callback Requests",
 };

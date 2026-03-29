@@ -152,22 +152,43 @@ export async function notifyTestAttemptResult(attemptId: string) {
     const totalMarks = attempt.mockTest?.totalMarks ?? 0;
     const score = attempt.totalScore ?? 0;
     const percentile = attempt.percentile ?? null;
-    const cloudfrontUrl = process.env.CLOUDFRONT_URL;
-    if (!cloudfrontUrl) {
-        throw new AppError("CLOUDFRONT_URL is not configured", 500);
-    }
-
-    const { pdfBytes, filename } = await generateTestAttemptReportPdf(attemptId);
-    const objectKey = await uploadReportToS3(pdfBytes, filename);
-    const reportUrl = toPublicReportUrl(cloudfrontUrl, objectKey, filename);
+    const physicsMarks = attempt.physicsMarks ?? 0;
+    const chemistryMarks = attempt.chemistryMarks ?? 0;
+    const mathematicsMarks = attempt.mathematicsMarks ?? 0;
+    const zoologyMarks = attempt.zoologyMarks ?? 0;
+    const botanyMarks = attempt.botanyMarks ?? 0;
+    const examType = attempt.mockTest?.batch?.examType ?? attempt.student.targetExam;
+    const submittedAt = attempt.submittedAt
+        ? new Date(attempt.submittedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+        : "Not submitted";
+    const subjectMarksByExamType =
+        examType === "JEE"
+            ? [
+                { label: "Physics", marks: physicsMarks },
+                { label: "Chemistry", marks: chemistryMarks },
+                { label: "Mathematics", marks: mathematicsMarks },
+            ]
+            : [
+                { label: "Physics", marks: physicsMarks },
+                { label: "Chemistry", marks: chemistryMarks },
+                { label: "Zoology", marks: zoologyMarks },
+                { label: "Botany", marks: botanyMarks },
+            ];
+    const subjectWiseInline = subjectMarksByExamType
+        .map((subject) => `${subject.label} ${subject.marks}`)
+        .join(", ");
 
     const messageLines = [
         `Dear Parent,`,
         ``,
-        `Test result for ${studentName} is now available.`,
+        `Mock Test Performance Summary`,
+        `Student: ${studentName}`,
         `Test: ${testName}`,
-        `Score: ${score} / ${totalMarks}`,
-        `Report: ${reportUrl}`,
+        `Submitted on: ${submittedAt}`,
+        ``,
+        `Overall Score: ${score} / ${totalMarks}`,
+        `Subject-wise Marks:`,
+        ...subjectMarksByExamType.map((subject) => `- ${subject.label}: ${subject.marks}`),
     ];
 
     if (percentile !== null) {
@@ -180,18 +201,18 @@ export async function notifyTestAttemptResult(attemptId: string) {
     const parentEmail = attempt.student.parentEmail;
     const parentName = attempt.student.parentName ?? "Parent";
     const emailHtml = getParentNotificationEmailHtml({
-        title: "Test report is ready",
+        title: "Mock test performance update",
         greeting: `Dear ${parentName},`,
         lines: [
-            `Test result for ${studentName} is now available.`,
+            `Here is the latest mock test summary for ${studentName}.`,
             `Test: ${testName}`,
-            `Score: ${score} / ${totalMarks}`,
+            `Submitted on: ${submittedAt}`,
+            `Overall Score: ${score} / ${totalMarks}`,
+            `Subject-wise: ${subjectWiseInline}`,
             ...(percentile !== null ? [`Percentile: ${percentile.toFixed(2)}%`] : []),
         ],
-        ctaLabel: "View student report",
-        ctaUrl: reportUrl,
     });
-    const emailSubject = `Instructis: ${studentName}'s ${testName} report`;
+    const emailSubject = `Instructis: ${studentName}'s ${testName} performance update`;
 
     try {
         await sendWhatsAppMessage(attempt.student.parentPhone, body);
@@ -218,8 +239,6 @@ export async function notifyTestAttemptResult(attemptId: string) {
             metadata: {
                 mockTestId: attempt.mockTestId,
                 testName,
-                reportUrl,
-                reportKey: objectKey,
                 parentEmail,
                 emailStatus,
                 emailError,
@@ -234,8 +253,6 @@ export async function notifyTestAttemptResult(attemptId: string) {
             metadata: {
                 mockTestId: attempt.mockTestId,
                 testName,
-                reportUrl,
-                reportKey: objectKey,
                 error: error instanceof Error ? error.message : String(error),
             },
         });

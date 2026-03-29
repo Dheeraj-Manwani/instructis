@@ -6,7 +6,8 @@ import { motion, useInView, animate } from "motion/react";
 import {
   ArrowRight, Play, CheckCircle2, Upload, Brain, Search, MessageSquare,
   FileText, BarChart3, Star, Twitter, Linkedin, MessageCircle, ChevronRight,
-  School, GraduationCap, Smartphone, Trophy, Sparkles, Menu, X, Rocket
+  School, GraduationCap, Smartphone, Trophy, Sparkles, Menu, X, Rocket,
+  UserCircle2, Palette, LogIn, LayoutDashboard, LogOut, PhoneCall, MapPin, Copy, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,24 +27,28 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import CallbackFloatingPhoneButton from "@/components/CallbackFloatingPhoneButton";
 import { ModeToggle } from "@/components/ModeToggle";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { authClient } from "@/lib/auth-client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-/* ─── helpers ─── */
-// function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
-//   const ref = useRef<HTMLSpanElement>(null);
-//   const inView = useInView(ref, { once: true, margin: "-40px" });
-//   useEffect(() => {
-//     if (!inView || !ref.current) return;
-//     const ctrl = animate(0, target, {
-//       duration: 2,
-//       ease: "easeOut",
-//       onUpdate: (v) => {
-//         if (ref.current) ref.current.textContent = Math.floor(v).toLocaleString("en-IN") + suffix;
-//       },
-//     });
-//     return () => ctrl.stop();
-//   }, [inView, target, suffix]);
-//   return <span ref={ref}>0{suffix}</span>;
-// }
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
 const fadeUp = {
@@ -76,13 +81,44 @@ function SectionWrap({ children, className, id }: { children: React.ReactNode; c
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const router = useRouter();
+  const { setTheme } = useTheme();
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
+  const isSignedIn = Boolean(session?.user);
+  const roleLabel = session?.user?.role
+    ? String(session.user.role)
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
+  const supportPhone = "7093858372";
+  const dummyMenuItems = ["Centers", "Courses", "Results", "Scholarship", "Students Hub", "Blogs", "Careers"];
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", h, { passive: true });
     return () => window.removeEventListener("scroll", h);
   }, []);
+
+  async function handleSignOut() {
+    const { error } = await authClient.signOut();
+    if (error) {
+      toast.error(error.message || "Failed to sign out");
+      return;
+    }
+    toast.success("Signed out successfully");
+    window.location.href = "/auth/sign-in";
+  }
+
+  async function handleCopyPhone() {
+    try {
+      await navigator.clipboard.writeText(supportPhone);
+      toast.success("Phone number copied");
+    } catch {
+      toast.error("Unable to copy phone number");
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans overflow-x-hidden">
@@ -97,7 +133,7 @@ export default function LandingPage() {
             : "bg-white/80 dark:bg-slate-950/80 dark:border-slate-800"
         )}
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+        <div className=" mx-auto flex items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center">
             <div className="w-9 h-9 rounded-xl bg-transparent flex items-center justify-center overflow-hidden">
               <Image
@@ -109,31 +145,90 @@ export default function LandingPage() {
             <span className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Instructis</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-2">
-            {/* <a
-              href="#features"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+          <div className="hidden md:flex items-center gap-5">
+            <div className="flex items-center gap-4">
+              {dummyMenuItems.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className="text-sm font-medium text-slate-700 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 rounded-full border-slate-200 px-3 text-xs font-semibold dark:border-slate-700"
+              onClick={() => setPhoneModalOpen(true)}
             >
-              Features
-            </a>
-            <a
-              href="#institutes"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              <PhoneCall className="h-4 w-4 text-blue-500" />
+              <span>Call now</span>
+              <span className="text-slate-600 dark:text-slate-300">{supportPhone}</span>
+            </Button>
+            {/* <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-full border-slate-200 dark:border-slate-700"
             >
-              For Institutes
-            </a>
-            <a
-              href="#pricing"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              Pricing
-            </a> */}
-            <Link href="/batches">
-              <Button className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-105 transition-all duration-300">
-                Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-            <ModeToggle />
+              <MapPin className="h-4 w-4 text-rose-500" />
+              <span className="sr-only">Location</span>
+            </Button> */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-11 w-11 rounded-full border-slate-200 dark:border-slate-700">
+                  <UserCircle2 className="h-6 w-6" />
+                  <span className="sr-only">Open profile menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
+                  <span>{isSignedIn ? session?.user?.email : "Account"}</span>
+                  {isSignedIn && roleLabel && (
+                    <span className="mt-1 inline-flex items-center gap-1 text-xs text-foreground/80">
+                      <Shield className="h-3.5 w-3.5 text-primary" />
+                      <span className="font-medium">Role: {roleLabel}</span>
+                    </span>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Palette className="h-4 w-4" />
+                    <span>Theme</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                {isSignedIn ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/batches">
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSignOut} variant="destructive">
+                      <LogOut className="h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem asChild disabled={isSessionPending}>
+                    <Link href="/auth/sign-in">
+                      <LogIn className="h-4 w-4" />
+                      <span>Sign in</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
           </div>
 
@@ -163,6 +258,27 @@ export default function LandingPage() {
           </motion.div>
         )}
       </nav>
+      <Dialog open={phoneModalOpen} onOpenChange={setPhoneModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Contact Number</DialogTitle>
+            <DialogDescription>Use the number below to call or copy.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm font-semibold">{supportPhone}</div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={handleCopyPhone}>
+              <Copy className="h-4 w-4" />
+              Copy
+            </Button>
+            <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700">
+              <a href={`tel:${supportPhone}`}>
+                <PhoneCall className="h-4 w-4" />
+                Call
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ════════ HERO ════════ */}
       {/* <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
