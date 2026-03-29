@@ -54,15 +54,20 @@ export async function createSessionWithAttendance(
   data: CreateClassSessionInput
 ) {
   return prisma.$transaction(async (tx) => {
+    const classDate = new Date(data.date);
+    const startTime = data.startTime ? new Date(data.startTime) : classDate;
+    const endTime = data.endTime ? new Date(data.endTime) : new Date(startTime.getTime() + 60 * 60 * 1000);
+
     const session = await tx.classSession.create({
       data: {
         batchId: data.batchId,
         facultyId,
         subject: data.subject,
+        title: data.topic?.trim() || "Attendance Session",
         topic: data.topic,
-        date: new Date(data.date),
-        startTime: data.startTime ? new Date(data.startTime) : undefined,
-        endTime: data.endTime ? new Date(data.endTime) : undefined,
+        date: classDate,
+        startTime,
+        endTime,
         notes: data.notes,
       },
       select: {
