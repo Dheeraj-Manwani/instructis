@@ -49,12 +49,12 @@ type NavItem = {
 
 const allNavItems: NavItem[] = [
   // demo / navigation options for faculty (non-navigating)
-  { title: "Dashboard", path: "/dashboard", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Students", path: "/students", icon: Users, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Quizzes", path: "/quizzes", icon: PenTool, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Results", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Attendance", path: "/attendance", icon: Bell, roles: [RoleEnum.FACULTY], isDemo: true },
-  { title: "Reports", path: "/reports", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Dashboard", path: "/dashboard", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Students", path: "/students", icon: Users, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Quizzes", path: "/quizzes", icon: PenTool, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Results", path: "/results", icon: Trophy, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Attendance", path: "/attendance", icon: Bell, roles: [RoleEnum.FACULTY], isDemo: true },
+  // { title: "Reports", path: "/reports", icon: BarChart3, roles: [RoleEnum.FACULTY], isDemo: true },
 
   // existing faculty items
   { title: "My Batches", path: "/my-batches", icon: Users, roles: [RoleEnum.FACULTY] },
