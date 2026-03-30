@@ -167,7 +167,7 @@ export async function findStudentsNotInBatch(
     where: {
       OR: [
         { batchId: null },
-        { batchId: { not: batchId } },
+        // { batchId: { not: batchId } },
       ],
       user: {
         role: "STUDENT",

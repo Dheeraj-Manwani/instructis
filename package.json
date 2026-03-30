@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "email:dummy": "npx tsx scripts/send-dummy-resend-email.ts",
+    "seed:indian-people": "npx tsx prisma/seed-indian-people.ts",
     "seed:questions": "npx tsx prisma/seed-questions.ts",
     "seed:practice-questions": "npx tsx prisma/seed-practice-questions.ts",
     "postinstall": "prisma generate"
